@@ -168,55 +168,42 @@
     <script>
         lucide.createIcons();
 
-        // --- MAP CONFIGURATION ---
-        
-        // 1. Define the clean CartoDB Baselayers
-        // Light basemap
-        const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20
+        // --- MAP CONFIGURATION (OpenStreetMap pulito senza API Key) ---
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
         });
-
-        // Elegant Dark basemap (This solves your request!)
-        const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20
-        });
-
-        // 2. Initialize Map with the correct initial theme
-        const isInitialDark = document.documentElement.classList.contains('dark');
-        const currentBasemap = isInitialDark ? cartoDark : cartoLight;
 
         const map = L.map('map', { 
             zoomControl: false,
-            layers: [currentBasemap] // Add default layer here
+            layers: [osmLayer]
         }).setView([45.0703, 7.6869], 14);
 
-        // Add Zoom control to bottom right
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // 3. Theme Toggle Logic (Linked to Map Change)
+        // Theme Toggle Logic con filtro CSS dark mode per la mappa
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeIcon = document.getElementById('themeIcon');
+        const mapContainer = document.getElementById('map');
+
+        // Controlla se la dark mode è attiva all'avvio
+        const isInitialDark = document.documentElement.classList.contains('dark');
+        if (isInitialDark) {
+            mapContainer.style.filter = 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)';
+        }
 
         themeToggleBtn.addEventListener('click', () => {
-            // Toggle Tailwind dark class
             document.documentElement.classList.toggle('dark');
             const isDark = document.documentElement.classList.contains('dark');
             
-            // Update Icon
             themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
             lucide.createIcons();
 
-            // Switch Map Layers instantly
+            // Applica o rimuove il filtro scuro sulla mappa in modo fluido
             if (isDark) {
-                map.removeLayer(cartoLight);
-                map.addLayer(cartoDark);
+                mapContainer.style.filter = 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)';
             } else {
-                map.removeLayer(cartoDark);
-                map.addLayer(cartoLight);
+                mapContainer.style.filter = 'none';
             }
         });
 
