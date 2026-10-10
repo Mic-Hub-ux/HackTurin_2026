@@ -18,10 +18,9 @@ The device doesn't just detect presence; it interprets the scene in real time, d
 
 * **Local AI & Computer Vision:** Running machine learning models directly on the edge device for real-time classification (pedestrians, cyclists, animals, and emergency vehicles).
 * **Dynamic Light Signaling:** An integrated RGB LED system paired with the traffic light that changes color based on the detected user category to maximize visibility and safety:
-
-    * **Pedestrians:** Blue Light
-    **Cyclists:** Magenta Light
-    **Ambulances / Emergency:** Orange Flashing Light
+  * **Pedestrians:** Blue Light
+  * **Cyclists:** Magenta Light
+  * **Ambulances / Emergency:** Orange Flashing Light
 * **Traffic Intensity & Counting:** Counting passing vehicles to estimate traffic intensity in specific areas for statistical and planning purposes.
 * **Offline Operation (Edge):** Full operational capability ensured even without internet connectivity.
 * **P2P Inter-Node Communication:** Local mesh/P2P network allowing adjacent smart crossings to share immediate traffic states, hazards, or approaching emergency vehicles to synchronize green waves or warnings.
