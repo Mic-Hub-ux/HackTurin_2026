@@ -208,15 +208,13 @@
         // --- MARKER LOGIC ---
         let markers = {};
 
-        // Define custom icons to match the clean aesthetic
-        const createCountIcon = (colorClass) => {
-            return L.divIcon({
-                html: `<div class="w-4 h-4 rounded-full border-2 border-white shadow-lg ${colorClass} animate-pulse"></div>`,
-                className: '', // Remove default leaflet-div-icon styles
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
-            });
-        };
+// Icona uniforme, ben visibile e dello stesso colore per tutti i nodi
+        const peerIcon = L.divIcon({
+            html: `<div class="w-5 h-5 rounded-full bg-blue-600 border-2 border-white shadow-2xl flex items-center justify-center animate-pulse"></div>`,
+            className: '',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
 
         const iconMap = {
             pedestrians: createCountIcon('bg-blue-500'),
@@ -231,7 +229,7 @@
             return iconMap.pedestrians;
         }
 
-        function fetchTrafficData() {
+function fetchTrafficData() {
             fetch('/api/traffic')
                 .then(res => res.json())
                 .then(data => {
@@ -240,7 +238,6 @@
                     const showCyc = document.getElementById('filterCyclists').checked;
                     const showAmb = document.getElementById('filterAmbulances').checked;
 
-                    // Remove markers for nodes that are filtered out by text search
                     Object.keys(markers).forEach(id => {
                         if (searchQuery && !id.toLowerCase().includes(searchQuery)) {
                             map.removeLayer(markers[id]);
@@ -251,19 +248,15 @@
                     data.forEach(node => {
                         const nodeId = node.node_id.toLowerCase();
                         
-                        // Apply text search filter
                         if (searchQuery && !nodeId.includes(searchQuery)) return;
 
-                        // Apply category visibility filters (if none are checked, hide all)
                         let visible = false;
                         if (showPed && node.counts.pedestrians > 0) visible = true;
                         if (showCyc && node.counts.cyclists > 0) visible = true;
                         if (showAmb && node.counts.ambulances > 0) visible = true;
                         
-                        if (!visible && showPed === false && showCyc === false && showAmb === false) {
-                            // keep hidden if filters exist
-                        } else if (!visible) {
-                             if (markers[node.node_id]) {
+                        if (!visible && (showPed || showCyc || showAmb)) {
+                            if (markers[node.node_id]) {
                                 map.removeLayer(markers[node.node_id]);
                                 delete markers[node.node_id];
                             }
@@ -274,7 +267,6 @@
                         const lon = node.coordinates.lon;
                         const counts = node.counts;
 
-                        // Build elegant popup HTML
                         let metricsHtml = `
                             <div class="min-w-[160px] font-sans overflow-hidden">
                                 <div class="px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-600">
@@ -299,37 +291,24 @@
                             </div>
                         `;
 
-                        const selectedIcon = getMarkerIcon(counts);
-
                         if (markers[node.node_id]) {
-                            // Update position
                             markers[node.node_id].setLatLng([lat, lon]);
-                            // Update icon (it might change based on counts)
-                            markers[node.node_id].setIcon(selectedIcon);
-                            // Update popup content only if it's already open (prevents flickering)
                             const popup = markers[node.node_id].getPopup();
                             if (popup && popup.isOpen()) {
                                 popup.setContent(metricsHtml);
                             }
                         } else {
-                            // Create new marker with custom icon
-                            const marker = L.marker([lat, lon], { icon: selectedIcon }).addTo(map);
+                            // Utilizza l'icona uniforme per tutti i marker
+                            const marker = L.marker([lat, lon], { icon: peerIcon }).addTo(map);
                             marker.bindPopup(metricsHtml);
 
-                            // Open popup on hover
                             marker.on('mouseover', function () {
                                 this.openPopup();
-                            });
-                            marker.on('mouseout', function () {
-                                // NOTE: Normally we'd close on mouseout, but if they want to click
-                                // something inside the popup, this is bad. Keep open for now.
-                                // this.closePopup();
                             });
 
                             markers[node.node_id] = marker;
                         }
                     });
-                    // Re-run icon engine for popup icons
                     lucide.createIcons();
                 })
                 .catch(err => console.error('Error fetching data:', err));
