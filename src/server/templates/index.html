@@ -168,25 +168,24 @@
     <script>
         lucide.createIcons();
 
-        // --- MAP CONFIGURATION (OpenStreetMap pulito senza API Key) ---
-        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// --- MAP CONFIGURATION (Wikimedia Maps - Pulita, senza icone di negozi o POI superflui) ---
+        const cleanMapLayer = L.tileLayer('https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; Wikimedia maps | OpenStreetMap contributors'
         });
 
         const map = L.map('map', { 
             zoomControl: false,
-            layers: [osmLayer]
+            layers: [cleanMapLayer]
         }).setView([45.0703, 7.6869], 14);
 
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Theme Toggle Logic con filtro CSS dark mode per la mappa
+        // Theme Toggle Logic con filtro CSS dark mode per la mappa pulita
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeIcon = document.getElementById('themeIcon');
         const mapContainer = document.getElementById('map');
 
-        // Controlla se la dark mode è attiva all'avvio
         const isInitialDark = document.documentElement.classList.contains('dark');
         if (isInitialDark) {
             mapContainer.style.filter = 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)';
@@ -199,7 +198,6 @@
             themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
             lucide.createIcons();
 
-            // Applica o rimuove il filtro scuro sulla mappa in modo fluido
             if (isDark) {
                 mapContainer.style.filter = 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)';
             } else {
