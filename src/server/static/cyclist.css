@@ -42,16 +42,23 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--card-bg);
-    padding: 14px 18px;
-    border-radius: 14px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    transition: background-color 0.3s ease;
+    position: relative;
+    width: 100%;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 10px 0;
 }
 
-.header-text h1 {
-    font-size: 1.2rem;
+.header-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+}
+
+.header-center h1 {
+    font-size: 1.4rem;
     margin: 0 0 2px 0;
     color: var(--text-primary);
 }
@@ -61,15 +68,16 @@ header {
     color: var(--text-secondary);
 }
 
-/* Theme Toggle Button */
 .theme-toggle-btn {
-    background: var(--input-bg);
+    margin-left: auto;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 8px 12px;
     border-radius: 10px;
     cursor: pointer;
     font-size: 1rem;
+    z-index: 10;
     transition: transform 0.2s;
 }
 
@@ -105,7 +113,10 @@ select {
     outline: none;
 }
 
-/* Safety Alert Banner */
+select:focus {
+    border-color: var(--accent-color);
+}
+
 #alertBanner {
     background: #34c759;
     color: #ffffff;
