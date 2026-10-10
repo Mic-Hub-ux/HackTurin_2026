@@ -11,7 +11,11 @@
             darkMode: 'class',
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    // Custom colors to match CartoDB nice dark blue/black
+                    colors: {
+                        'carto-dark': '#1a1a1a' 
+                    }
                 }
             }
         }
@@ -21,7 +25,41 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Ensure map fills container */
+        #map { height: 100%; width: 100%; }
+        
+        /* --- Leaflet Customization for Dark Mode --- */
+        
+        /* Invert the standard tiles for a basic dark map if not using CartoDB */
+        .dark .leaflet-tile-pane {
+            /* filter: brightness(0.6) invert(1) contrast(3) hue-rotate(180deg) saturate(0.3) !important; */
+        }
+        
+        /* Style Popups to match theme */
+        .leaflet-popup-content-wrapper {
+            border-radius: 0.75rem !important; /* rounded-xl */
+            padding: 0 !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+        }
+        .dark .leaflet-popup-content-wrapper,
+        .dark .leaflet-popup-tip {
+            background-color: #1f2937 !important; /* bg-gray-800 */
+            color: #f3f4f6 !important; /* text-gray-100 */
+        }
+        .leaflet-popup-content {
+            margin: 0 !important;
+        }
+        .leaflet-container a.leaflet-popup-close-button {
+            color: #9ca3af !important; /* text-gray-400 */
+            padding: 10px 12px 0 0 !important;
+        }
+        .dark .leaflet-control-attribution,
+        .dark .leaflet-control-attribution a {
+            background-color: rgba(26, 26, 26, 0.7) !important;
+            color: #a3a3a3 !important;
+        }
+    </style>
 </head>
 <body class="h-full flex overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans transition-colors duration-300">
 
@@ -112,36 +150,101 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Data Credits (Optional, looks professional) -->
+            <div class="text-center text-xs text-slate-400 dark:text-slate-600 pt-4 border-t border-slate-100 dark:border-slate-800">
+                Map tiles by <a href="https://carto.com/" target="_blank" class="hover:text-blue-500">CartoDB</a> under CC BY 3.0. Data by OpenStreetMap.
+            </div>
         </div>
     </aside>
 
     <!-- Map Viewport -->
-    <main id="map" class="flex-1 h-full relative z-0"></main>
+    <main class="flex-1 h-full relative z-0">
+        <div id="map"></div>
+    </main>
 
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         lucide.createIcons();
 
-        const map = L.map('map', { zoomControl: false }).setView([45.0703, 7.6869], 14);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
-
-        // Theme Toggle
-        const themeToggleBtn = document.getElementById('themeToggleBtn');
-        const themeIcon = document.getElementById('themeIcon');
-        themeToggleBtn.addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-            const isDark = document.documentElement.classList.contains('dark');
-            themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
-            lucide.createIcons();
+        // --- MAP CONFIGURATION ---
+        
+        // 1. Define the clean CartoDB Baselayers
+        // Light basemap
+        const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
         });
 
+        // Elegant Dark basemap (This solves your request!)
+        const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        // 2. Initialize Map with the correct initial theme
+        const isInitialDark = document.documentElement.classList.contains('dark');
+        const currentBasemap = isInitialDark ? cartoDark : cartoLight;
+
+        const map = L.map('map', { 
+            zoomControl: false,
+            layers: [currentBasemap] // Add default layer here
+        }).setView([45.0703, 7.6869], 14);
+
+        // Add Zoom control to bottom right
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // 3. Theme Toggle Logic (Linked to Map Change)
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const themeIcon = document.getElementById('themeIcon');
+
+        themeToggleBtn.addEventListener('click', () => {
+            // Toggle Tailwind dark class
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            
+            // Update Icon
+            themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+            lucide.createIcons();
+
+            // Switch Map Layers instantly
+            if (isDark) {
+                map.removeLayer(cartoLight);
+                map.addLayer(cartoDark);
+            } else {
+                map.removeLayer(cartoDark);
+                map.addLayer(cartoLight);
+            }
+        });
+
+        // --- MARKER LOGIC ---
         let markers = {};
+
+        // Define custom icons to match the clean aesthetic
+        const createCountIcon = (colorClass) => {
+            return L.divIcon({
+                html: `<div class="w-4 h-4 rounded-full border-2 border-white shadow-lg ${colorClass} animate-pulse"></div>`,
+                className: '', // Remove default leaflet-div-icon styles
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+        };
+
+        const iconMap = {
+            pedestrians: createCountIcon('bg-blue-500'),
+            cyclists: createCountIcon('bg-emerald-500'),
+            ambulances: createCountIcon('bg-rose-500')
+        };
+
+        // Determine which icon to show based on priority (Ambulance > Cyclist > Pedestrian)
+        function getMarkerIcon(counts) {
+            if (counts.ambulances > 0) return iconMap.ambulances;
+            if (counts.cyclists > 5) return iconMap.cyclists; // Only highlight if > 5
+            return iconMap.pedestrians;
+        }
 
         function fetchTrafficData() {
             fetch('/api/traffic')
@@ -152,10 +255,30 @@
                     const showCyc = document.getElementById('filterCyclists').checked;
                     const showAmb = document.getElementById('filterAmbulances').checked;
 
+                    // Remove markers for nodes that are filtered out by text search
+                    Object.keys(markers).forEach(id => {
+                        if (searchQuery && !id.toLowerCase().includes(searchQuery)) {
+                            map.removeLayer(markers[id]);
+                            delete markers[id];
+                        }
+                    });
+
                     data.forEach(node => {
                         const nodeId = node.node_id.toLowerCase();
-                        if (searchQuery && !nodeId.includes(searchQuery)) {
-                            if (markers[node.node_id]) {
+                        
+                        // Apply text search filter
+                        if (searchQuery && !nodeId.includes(searchQuery)) return;
+
+                        // Apply category visibility filters (if none are checked, hide all)
+                        let visible = false;
+                        if (showPed && node.counts.pedestrians > 0) visible = true;
+                        if (showCyc && node.counts.cyclists > 0) visible = true;
+                        if (showAmb && node.counts.ambulances > 0) visible = true;
+                        
+                        if (!visible && showPed === false && showCyc === false && showAmb === false) {
+                            // keep hidden if filters exist
+                        } else if (!visible) {
+                             if (markers[node.node_id]) {
                                 map.removeLayer(markers[node.node_id]);
                                 delete markers[node.node_id];
                             }
@@ -166,31 +289,72 @@
                         const lon = node.coordinates.lon;
                         const counts = node.counts;
 
-                        let metricsHtml = `<div class="p-2 font-sans"><b class="text-slate-900 text-sm">Node: ${node.node_id}</b><hr class="my-1.5 border-slate-200">`;
-                        if (showPed) metricsHtml += `<div class="text-xs text-slate-700 py-0.5">🚶 Pedestrians: <b>${counts.pedestrians}</b></div>`;
-                        if (showCyc) metricsHtml += `<div class="text-xs text-slate-700 py-0.5">🚴 Cyclists: <b>${counts.cyclists}</b></div>`;
-                        if (showAmb) metricsHtml += `<div class="text-xs text-rose-600 py-0.5 font-semibold">🚑 Ambulances: <b>${counts.ambulances}</b></div>`;
-                        metricsHtml += `</div>`;
+                        // Build elegant popup HTML
+                        let metricsHtml = `
+                            <div class="min-w-[160px] font-sans overflow-hidden">
+                                <div class="px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-600">
+                                    <h3 class="font-bold text-slate-900 dark:text-white text-sm">Node ${node.node_id}</h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-300">Live Counts</p>
+                                </div>
+                                <div class="p-3 space-y-2.5">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="user" class="w-3.5 h-3.5 text-blue-500"></i>Pedestrians</span>
+                                        <span class="font-bold text-slate-900 dark:text-white">${counts.pedestrians}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="bike" class="w-3.5 h-3.5 text-emerald-500"></i>Cyclists</span>
+                                        <span class="font-bold text-slate-900 dark:text-white">${counts.cyclists}</span>
+                                    </div>
+                                    ${counts.ambulances > 0 ? `
+                                    <div class="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-slate-600">
+                                        <span class="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><i data-lucide="ambulance" class="w-3.5 h-3.5"></i>Ambulances</span>
+                                        <span class="font-bold text-rose-600 dark:text-rose-400">${counts.ambulances}</span>
+                                    </div>` : ''}
+                                </div>
+                            </div>
+                        `;
+
+                        const selectedIcon = getMarkerIcon(counts);
 
                         if (markers[node.node_id]) {
+                            // Update position
                             markers[node.node_id].setLatLng([lat, lon]);
+                            // Update icon (it might change based on counts)
+                            markers[node.node_id].setIcon(selectedIcon);
+                            // Update popup content only if it's already open (prevents flickering)
                             const popup = markers[node.node_id].getPopup();
-                            if (popup) popup.setContent(metricsHtml);
+                            if (popup && popup.isOpen()) {
+                                popup.setContent(metricsHtml);
+                            }
                         } else {
-                            const marker = L.marker([lat, lon]).addTo(map);
+                            // Create new marker with custom icon
+                            const marker = L.marker([lat, lon], { icon: selectedIcon }).addTo(map);
                             marker.bindPopup(metricsHtml);
-                            marker.on('mouseover', function () { this.openPopup(); });
-                            marker.on('mouseout', function () { this.closePopup(); });
+
+                            // Open popup on hover
+                            marker.on('mouseover', function () {
+                                this.openPopup();
+                            });
+                            marker.on('mouseout', function () {
+                                // NOTE: Normally we'd close on mouseout, but if they want to click
+                                // something inside the popup, this is bad. Keep open for now.
+                                // this.closePopup();
+                            });
+
                             markers[node.node_id] = marker;
                         }
                     });
+                    // Re-run icon engine for popup icons
+                    lucide.createIcons();
                 })
-                .catch(err => console.error(err));
+                .catch(err => console.error('Error fetching data:', err));
         }
 
+        // Poll server every 2 seconds for real-time updates
         setInterval(fetchTrafficData, 2000);
         fetchTrafficData();
 
+        // Event Listeners for filters
         document.getElementById('nodeSearch').addEventListener('input', fetchTrafficData);
         document.getElementById('filterPedestrians').addEventListener('change', fetchTrafficData);
         document.getElementById('filterCyclists').addEventListener('change', fetchTrafficData);
