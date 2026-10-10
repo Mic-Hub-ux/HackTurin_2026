@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Crossing - Cyclist View</title>
-    <!-- Custom External CSS -->
+    <!-- Link to the new dark theme CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='cyclist.css') }}">
 </head>
 <body>
@@ -41,7 +41,7 @@
             </div>
             <div class="metric-card">
                 <div class="metric-title">🚑 Ambulances</div>
-                <div class="metric-value" id="valAmbulances" style="color: #ff3b30;">-</div>
+                <div class="metric-value" id="valAmbulances">-</div>
             </div>
         </div>
     </div>
@@ -69,20 +69,24 @@
                     valCyclists.textContent = counts.cyclists;
                     valAmbulances.textContent = counts.ambulances;
 
-                    // Safety Logic & Alert Generation
+                    // Safety Logic & Alert Generation (Dark Theme Colors)
                     if (counts.ambulances > 0) {
-                        alertBanner.style.backgroundColor = "#ff3b30"; // Red
+                        alertBanner.style.backgroundColor = "#ff453a"; // Red
+                        alertBanner.style.color = "#000000";
                         alertBanner.innerHTML = "🚨 WARNING: Ambulance Approaching!";
                     } else if (counts.pedestrians > 12) {
-                        alertBanner.style.backgroundColor = "#ff9500"; // Orange
+                        alertBanner.style.backgroundColor = "#ff9f0a"; // Orange
+                        alertBanner.style.color = "#000000";
                         alertBanner.innerHTML = "⚠️ Caution: High Pedestrian Traffic";
                     } else {
-                        alertBanner.style.backgroundColor = "#34c759"; // Green
+                        alertBanner.style.backgroundColor = "#00cc66"; // Green
+                        alertBanner.style.color = "#000000";
                         alertBanner.innerHTML = "🟢 Intersection Clear / Safe";
                     }
                 })
                 .catch(error => {
-                    alertBanner.style.backgroundColor = "#86868b";
+                    alertBanner.style.backgroundColor = "#3a3a3c"; // Dark Gray
+                    alertBanner.style.color = "#00bfff"; // Neon Blue text
                     alertBanner.innerHTML = "⏳ Waiting for Node Signal...";
                     valPedestrians.textContent = "-";
                     valCyclists.textContent = "-";
