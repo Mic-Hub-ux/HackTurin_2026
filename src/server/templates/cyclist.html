@@ -109,7 +109,7 @@
             lucide.createIcons();
         });
 
-        function fetchNodeData() {
+function fetchNodeData() {
             const selectedNode = nodeSelect.value;
 
             fetch(`/api/traffic/${selectedNode}`)
@@ -123,6 +123,7 @@
                     valCyclists.textContent = counts.cyclists;
                     valAmbulances.textContent = counts.ambulances;
 
+                    // Gestione priorità: Ambulanza (Rosso) -> Traffico Pedonale Elevato (Giallo/Arancione) -> Normale (Verde)
                     if (counts.ambulances > 0) {
                         alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-rose-600 text-white flex items-center justify-center gap-2 animate-pulse";
                         alertText.textContent = "WARNING: Ambulance Approaching!";
