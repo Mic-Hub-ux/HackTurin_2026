@@ -6,126 +6,8 @@
     <title>Smart Crossing - Turin Dashboard</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            height: 100vh;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f6f9;
-        }
-        #sidebar {
-            width: 340px;
-            background: #ffffff;
-            padding: 24px;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.05);
-            overflow-y: auto;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-        #map {
-            flex-grow: 1;
-            height: 100%;
-        }
-        h2 {
-            margin-top: 0;
-            color: #1d1d1f;
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .filter-group label {
-            font-weight: 600;
-            color: #48484a;
-            font-size: 0.9rem;
-        }
-        .filter-group input[type="text"] {
-            padding: 12px;
-            border: 1px solid #d2d2d7;
-            border-radius: 10px;
-            font-size: 0.95rem;
-            outline: none;
-            transition: border-color 0.2s;
-            background: #fbfbfd;
-        }
-        .filter-group input[type="text"]:focus {
-            border-color: #0071e3;
-        }
-        
-        /* iPhone-style Toggle Switch */
-        .toggle-container {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 5px;
-        }
-        .toggle-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f5f5f7;
-            padding: 10px 14px;
-            border-radius: 12px;
-        }
-        .toggle-label {
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: #1d1d1f;
-        }
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 51px;
-            height: 31px;
-        }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #e5e5ea;
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 31px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 27px;
-            width: 27px;
-            left: 2px;
-            bottom: 2px;
-            background-color: white;
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 50%;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-        }
-        input:checked + .slider {
-            background-color: #34c759; /* iOS Green */
-        }
-        input:checked + .slider:before {
-            transform: translateX(20px);
-        }
-
-        .stats-box {
-            background: #f5f5f7;
-            padding: 14px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            color: #86868b;
-            line-height: 1.4;
-        }
-    </style>
+    <!-- Custom External CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
@@ -246,4 +128,4 @@
         document.getElementById('filterAmbulances').addEventListener('change', fetchTrafficData);
     </script>
 </body>
-</html> 
+</html>

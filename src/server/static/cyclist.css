@@ -1,0 +1,86 @@
+body {
+    margin: 0;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f8f9fa;
+    color: #1d1d1f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.container {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+header {
+    text-align: center;
+}
+h1 {
+    font-size: 1.5rem;
+    margin: 0 0 5px 0;
+    color: #1d1d1f;
+}
+.subtitle {
+    font-size: 0.9rem;
+    color: #86868b;
+}
+.node-select-box {
+    background: #ffffff;
+    padding: 16px;
+    border-radius: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #48484a;
+}
+select {
+    padding: 12px;
+    border: 1px solid #d2d2d7;
+    border-radius: 10px;
+    font-size: 1rem;
+    background: #fbfbfd;
+    outline: none;
+}
+/* Safety Alert Banner */
+#alertBanner {
+    background: #34c759; /* Default Safe Green */
+    color: white;
+    padding: 16px;
+    border-radius: 14px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: background-color 0.3s ease;
+}
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+.metric-card {
+    background: #ffffff;
+    padding: 18px;
+    border-radius: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.metric-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #0071e3;
+}
