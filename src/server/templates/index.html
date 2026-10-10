@@ -13,7 +13,11 @@
 
     <!-- Right Sidebar for Controls & Filters -->
     <div id="sidebar">
-        <h2>Smart Turin</h2>
+        <div class="sidebar-header">
+            <h2>Smart Turin</h2>
+            <button id="themeToggleBtn" class="theme-toggle-btn" title="Switch Day/Night Mode">🌙</button>
+        </div>
+
         <div class="stats-box">
             Real-time urban monitoring dashboard tracking pedestrian, cyclist, and emergency flows across active peer nodes.
         </div>
@@ -63,6 +67,17 @@
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
+
+        // Day/Night Theme Toggle Logic
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                themeToggleBtn.textContent = "☀️";
+            } else {
+                themeToggleBtn.textContent = "🌙";
+            }
+        });
 
         let markers = {};
 
