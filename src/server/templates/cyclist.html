@@ -1,81 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Crossing - Cyclist View</title>
-    <!-- Custom External CSS -->
+    <title>Efesto | Cyclist Safety Assistant</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='cyclist.css') }}">
 </head>
-<body>
+<body class="h-full bg-slate-50 dark:bg-black text-slate-900 dark:text-white font-sans flex flex-col items-center justify-start p-4 transition-colors duration-300">
 
-    <div class="container">
-       <header>
-    <div class="header-center">
-        <h1>Efesto</h1>
-        <div class="subtitle"> Safety Assistant</div>
-    </div>
-    <button id="themeToggleBtn" class="theme-toggle-btn" title="Switch Day/Night Mode">🌙</button>
-</header>
+    <div class="w-full max-w-md flex flex-col gap-5 my-auto">
+        
+        <!-- Header -->
+        <header class="flex items-center justify-between pt-2">
+            <div>
+                <h1 class="text-xl font-extrabold tracking-tight">Efesto</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Cyclist Safety Assistant</p>
+            </div>
+            <button id="themeToggleBtn" class="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-200 shadow-sm active:scale-95 transition-all">
+                <i data-lucide="moon" class="w-5 h-5" id="themeIcon"></i>
+            </button>
+        </header>
 
-        <!-- Node Selector -->
-        <div class="node-select-box">
-            <label for="nodeSelect">Approaching Intersection / Node</label>
-            <select id="nodeSelect">
-                <option value="node_01">Node 01 (Via Po)</option>
-                <option value="node_02">Node 02 (Via Roma)</option>
-                <option value="node_03">Node 03 (Corso Vittorio)</option>
-                <option value="node_04">Node 04 (Piazza Castello)</option>
-            </select>
+        <!-- Node Selector Box -->
+        <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-2">
+            <label for="nodeSelect" class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Approaching Intersection</label>
+            <div class="relative">
+                <select id="nodeSelect" class="w-full py-3 px-4 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl text-sm font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                    <option value="node_01">Node 01 (Via Po)</option>
+                    <option value="node_02">Node 02 (Via Roma)</option>
+                    <option value="node_03">Node 03 (Corso Vittorio)</option>
+                    <option value="node_04">Node 04 (Piazza Castello)</option>
+                </select>
+                <span class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400">
+                    <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                </span>
+            </div>
         </div>
 
-        <!-- Dynamic Safety Alert Box -->
-        <div id="alertBanner">🟢 Approaching Safe</div>
+        <!-- Dynamic Safety Alert Banner -->
+        <div id="alertBanner" class="p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-emerald-500 text-white flex items-center justify-center gap-2">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+            <span id="alertText">Approaching Safe</span>
+        </div>
 
-        <!-- Live Numbers Grid -->
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-title">🚶 Pedestrians</div>
-                <div class="metric-value" id="valPedestrians">-</div>
+        <!-- Live Metrics Grid -->
+        <div class="grid grid-cols-1 gap-3">
+            <!-- Pedestrians -->
+            <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
+                        <i data-lucide="user" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-sm font-medium text-slate-600 dark:text-zinc-400">Pedestrians</span>
+                </div>
+                <span class="text-2xl font-black tracking-tight text-blue-600 dark:text-blue-400" id="valPedestrians">-</span>
             </div>
-            <div class="metric-card">
-                <div class="metric-title">🚴 Cyclists</div>
-                <div class="metric-value" id="valCyclists">-</div>
+
+            <!-- Cyclists -->
+            <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
+                        <i data-lucide="bike" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-sm font-medium text-slate-600 dark:text-zinc-400">Cyclists</span>
+                </div>
+                <span class="text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400" id="valCyclists">-</span>
             </div>
-            <div class="metric-card">
-                <div class="metric-title">🚑 Ambulances</div>
-                <div class="metric-value" id="valAmbulances" style="color: #ff3b30;">-</div>
+
+            <!-- Ambulances -->
+            <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
+                        <i data-lucide="ambulance" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-sm font-medium text-slate-600 dark:text-zinc-400">Ambulances</span>
+                </div>
+                <span class="text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400" id="valAmbulances">-</span>
             </div>
         </div>
     </div>
 
     <script>
+        lucide.createIcons();
+
         const nodeSelect = document.getElementById('nodeSelect');
         const alertBanner = document.getElementById('alertBanner');
+        const alertText = document.getElementById('alertText');
         const valPedestrians = document.getElementById('valPedestrians');
         const valCyclists = document.getElementById('valCyclists');
         const valAmbulances = document.getElementById('valAmbulances');
         const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const themeIcon = document.getElementById('themeIcon');
 
-        // Theme Toggle Logic
         themeToggleBtn.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            if (document.body.classList.contains('dark-mode')) {
-                themeToggleBtn.textContent = "☀️"; // Switch icon to sun for day mode option
-            } else {
-                themeToggleBtn.textContent = "🌙"; // Switch icon to moon for night mode option
-            }
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+            lucide.createIcons();
         });
 
         function fetchNodeData() {
             const selectedNode = nodeSelect.value;
 
             fetch(`/api/traffic/${selectedNode}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error("Node data unavailable");
-                    }
-                    return response.json();
+                .then(res => {
+                    if (!res.ok) throw new Error("Unavailable");
+                    return res.json();
                 })
                 .then(data => {
                     const counts = data.counts;
@@ -83,32 +123,26 @@
                     valCyclists.textContent = counts.cyclists;
                     valAmbulances.textContent = counts.ambulances;
 
-                    // Safety Logic & Alert Generation
                     if (counts.ambulances > 0) {
-                        alertBanner.style.backgroundColor = "#ff3b30"; // Red
-                        alertBanner.style.color = "#ffffff";
-                        alertBanner.innerHTML = "🚨 WARNING: Ambulance Approaching!";
+                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-rose-600 text-white flex items-center justify-center gap-2 animate-pulse";
+                        alertText.textContent = "WARNING: Ambulance Approaching!";
                     } else if (counts.pedestrians > 12) {
-                        alertBanner.style.backgroundColor = "#ff9500"; // Orange
-                        alertBanner.style.color = "#ffffff";
-                        alertBanner.innerHTML = "⚠️ Caution: High Pedestrian Traffic";
+                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-amber-500 text-white flex items-center justify-center gap-2";
+                        alertText.textContent = "Caution: High Pedestrian Density";
                     } else {
-                        alertBanner.style.backgroundColor = "#34c759"; // Green
-                        alertBanner.style.color = "#ffffff";
-                        alertBanner.innerHTML = "🟢 Intersection Clear / Safe";
+                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-emerald-600 text-white flex items-center justify-center gap-2";
+                        alertText.textContent = "Intersection Clear & Safe";
                     }
                 })
-                .catch(error => {
-                    alertBanner.style.backgroundColor = "#86868b";
-                    alertBanner.style.color = "#ffffff";
-                    alertBanner.innerHTML = "⏳ Waiting for Node Signal...";
+                .catch(() => {
+                    alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-slate-700 text-slate-200 flex items-center justify-center gap-2";
+                    alertText.textContent = "Waiting for Node Signal...";
                     valPedestrians.textContent = "-";
                     valCyclists.textContent = "-";
                     valAmbulances.textContent = "-";
                 });
         }
 
-        // Poll every 1.5 seconds for instant updates
         setInterval(fetchNodeData, 1500);
         nodeSelect.addEventListener('change', fetchNodeData);
         fetchNodeData();
