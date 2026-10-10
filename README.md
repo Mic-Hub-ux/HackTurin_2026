@@ -18,6 +18,7 @@ The device doesn't just detect presence; it interprets the scene in real time, d
 
 * **Local AI & Computer Vision:** Running machine learning models directly on the edge device for real-time classification (pedestrians, cyclists, animals, and emergency vehicles).
 * **Dynamic Light Signaling:** An integrated RGB LED system paired with the traffic light that changes color based on the detected user category to maximize visibility and safety:
+
     * **Pedestrians:** Blue Light
     **Cyclists:** Magenta Light
     **Ambulances / Emergency:** Orange Flashing Light
