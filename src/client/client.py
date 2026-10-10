@@ -7,25 +7,37 @@ from queue import Empty
 
 URL = "https://michubux.pythonanywhere.com/api/traffic"
 
-NUM_NODES = 10
+NUM_NODES = 12
 DURATION = 60
 INTERVAL = 1
 TIMEOUT = 15
 
-# Coordinate GPS di luoghi reali a Torino
+# Griglia rettangolare 4x3 di 12 incroci reali a Torino
 LUOGHI_TORINO = [
-    {"name": "node_01", "latitude": 45.062237, "longitude": 7.672350},
-    {"name": "node_02", "latitude": 45.061826,"longitude": 7.673455},
-    {"name": "node_03", "latitude": 45.061596, "longitude": 7.674118},
-    {"name": "node_04","latitude": 45.061340,"longitude": 7.674811},
+    # Riga 1
+    {"name": "node_01", "latitude": 45.0625, "longitude": 7.6720},
+    {"name": "node_02", "latitude": 45.0625, "longitude": 7.6735},
+    {"name": "node_03", "latitude": 45.0625, "longitude": 7.6750},
+    # Riga 2
+    {"name": "node_04", "latitude": 45.0613, "longitude": 7.6720},
+    {"name": "node_05", "latitude": 45.0613, "longitude": 7.6735},
+    {"name": "node_06", "latitude": 45.0613, "longitude": 7.6750},
+    # Riga 3
+    {"name": "node_07", "latitude": 45.0601, "longitude": 7.6720},
+    {"name": "node_08", "latitude": 45.0601, "longitude": 7.6735},
+    {"name": "node_09", "latitude": 45.0601, "longitude": 7.6750},
+    # Riga 4
+    {"name": "node_10", "latitude": 45.0589, "longitude": 7.6720},
+    {"name": "node_11", "latitude": 45.0589, "longitude": 7.6735},
+    {"name": "node_12", "latitude": 45.0589, "longitude": 7.6750},
 ]
 
 
 def client_worker(node_number, start_event, stop_event, result_queue):
     node_id = f"node_{node_number:02d}"
 
-    # Ogni nodo sceglie una posizione una sola volta
-    luogo = random.choice(LUOGHI_TORINO)
+    # Assegnazione fissa e deterministica alla griglia 4x3
+    luogo = LUOGHI_TORINO[node_number - 1]
 
     latitude = luogo["latitude"]
     longitude = luogo["longitude"]
@@ -43,6 +55,9 @@ def client_worker(node_number, start_event, stop_event, result_queue):
     with requests.Session() as session:
         while not stop_event.is_set():
 
+            # Ambulanze più rare (circa 3% di probabilità)
+            is_ambulance = 1 if random.random() < 0.03 else 0
+
             dati = {
                 "node_id": node_id,
                 "coordinates": {
@@ -50,9 +65,9 @@ def client_worker(node_number, start_event, stop_event, result_queue):
                     "lon": longitude,
                 },
                 "counts": {
-                    "pedestrians": random.randint(0, 20),
-                    "cyclists": random.randint(0, 10),
-                    "ambulances": random.randint(0, 2),
+                    "pedestrians": random.randint(2, 25),
+                    "cyclists": random.randint(1, 15),
+                    "ambulances": is_ambulance,
                 },
             }
 
@@ -79,7 +94,7 @@ def client_worker(node_number, start_event, stop_event, result_queue):
                 print(
                     f"[{node_id}] HTTP {risposta.status_code} "
                     f"- {latenza:.3f}s - "
-                    f"GPS: {latitude}, {longitude}",
+                    f"Amb: {is_ambulance}",
                     flush=True
                 )
 
@@ -127,7 +142,7 @@ def main():
         processi.append(p)
 
     print(
-        f"\nAvvio test: {NUM_NODES} nodi, "
+        f"\nAvvio test griglia: {NUM_NODES} nodi (4x3), "
         f"{DURATION}s, {INTERVAL}s per richiesta/nodo\n"
     )
 
