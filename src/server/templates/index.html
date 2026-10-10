@@ -12,19 +12,19 @@
             padding: 0;
             display: flex;
             height: 100vh;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #f4f6f9;
         }
         #sidebar {
-            width: 320px;
+            width: 340px;
             background: #ffffff;
-            padding: 20px;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            padding: 24px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.05);
             overflow-y: auto;
             z-index: 1000;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 24px;
         }
         #map {
             flex-grow: 1;
@@ -32,55 +32,108 @@
         }
         h2 {
             margin-top: 0;
-            color: #2c3e50;
-            font-size: 1.4rem;
+            color: #1d1d1f;
+            font-size: 1.5rem;
+            font-weight: 700;
         }
         .filter-group {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
         .filter-group label {
-            font-weight: bold;
-            color: #34495e;
+            font-weight: 600;
+            color: #48484a;
             font-size: 0.9rem;
         }
-        .filter-group input, .filter-group select {
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
+        .filter-group input[type="text"] {
+            padding: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
             font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+            background: #fbfbfd;
         }
-        .checkbox-group {
+        .filter-group input[type="text"]:focus {
+            border-color: #0071e3;
+        }
+        
+        /* iPhone-style Toggle Switch */
+        .toggle-container {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
             margin-top: 5px;
         }
-        .checkbox-label {
-            font-weight: normal !important;
+        .toggle-row {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 8px;
-            cursor: pointer;
+            background: #f5f5f7;
+            padding: 10px 14px;
+            border-radius: 12px;
         }
+        .toggle-label {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #1d1d1f;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 51px;
+            height: 31px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #e5e5ea;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 31px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 27px;
+            width: 27px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 50%;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+        }
+        input:checked + .slider {
+            background-color: #34c759; /* iOS Green */
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
         .stats-box {
-            background: #f8fafc;
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
+            background: #f5f5f7;
+            padding: 14px;
+            border-radius: 12px;
             font-size: 0.85rem;
-            color: #64748b;
+            color: #86868b;
+            line-height: 1.4;
         }
     </style>
 </head>
 <body>
 
-    <!-- Right Sidebar for Filters -->
+    <!-- Right Sidebar for Controls & Filters -->
     <div id="sidebar">
-        <h2>Smart Crossing Turin</h2>
+        <h2>Smart Turin</h2>
         <div class="stats-box">
-            Live dashboard monitoring pedestrian, cyclist, and emergency traffic flows across Turin peer nodes.
+            Real-time urban monitoring dashboard tracking pedestrian, cyclist, and emergency flows across active peer nodes.
         </div>
 
         <div class="filter-group">
@@ -89,11 +142,29 @@
         </div>
 
         <div class="filter-group">
-            <label>Traffic Categories to Display</label>
-            <div class="checkbox-group">
-                <label class="checkbox-label"><input type="checkbox" id="filterPedestrians" checked> Pedestrians</label>
-                <label class="checkbox-label"><input type="checkbox" id="filterCyclists" checked> Cyclists</label>
-                <label class="checkbox-label"><input type="checkbox" id="filterAmbulances" checked> Ambulances</label>
+            <label>Traffic Categories</label>
+            <div class="toggle-container">
+                <div class="toggle-row">
+                    <span class="toggle-label">🚶 Pedestrians</span>
+                    <label class="switch">
+                        <input type="checkbox" id="filterPedestrians" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <span class="toggle-label">🚴 Cyclists</span>
+                    <label class="switch">
+                        <input type="checkbox" id="filterCyclists" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <span class="toggle-label">🚑 Ambulances</span>
+                    <label class="switch">
+                        <input type="checkbox" id="filterAmbulances" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
     </div>
@@ -104,10 +175,8 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Initialize map centered on Turin
         const map = L.map('map').setView([45.0703, 7.6869], 14);
 
-        // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
@@ -127,7 +196,6 @@
                     data.forEach(node => {
                         const nodeId = node.node_id.toLowerCase();
                         
-                        // Apply Node ID filter
                         if (searchQuery && !nodeId.includes(searchQuery)) {
                             if (markers[node.node_id]) {
                                 map.removeLayer(markers[node.node_id]);
@@ -140,25 +208,21 @@
                         const lon = node.coordinates.lon;
                         const counts = node.counts;
 
-                        // Build filtered metrics string based on checkboxes
-                        let metricsHtml = `<b>Node ID:</b> ${node.node_id}<br><hr style="margin: 5px 0;">`;
+                        let metricsHtml = `<b>Node ID:</b> ${node.node_id}<br><hr style="margin: 5px 0; border:0; border-top:1px solid #ddd;">`;
                         if (showPed) metricsHtml += `🚶 Pedestrians: <b>${counts.pedestrians}</b><br>`;
                         if (showCyc) metricsHtml += `🚴 Cyclists: <b>${counts.cyclists}</b><br>`;
                         if (showAmb) metricsHtml += `🚑 Ambulances: <b>${counts.ambulances}</b><br>`;
 
                         if (markers[node.node_id]) {
-                            // Update existing marker position & live-update popup content if open
                             markers[node.node_id].setLatLng([lat, lon]);
                             const popup = markers[node.node_id].getPopup();
                             if (popup) {
                                 popup.setContent(metricsHtml);
                             }
                         } else {
-                            // Create new marker
                             const marker = L.marker([lat, lon]).addTo(map);
                             marker.bindPopup(metricsHtml);
 
-                            // Open popup on hover (mouseover) and close on mouseout
                             marker.on('mouseover', function () {
                                 this.openPopup();
                             });
@@ -173,11 +237,9 @@
                 .catch(error => console.error('Error fetching traffic data:', error));
         }
 
-        // Poll server every 2 seconds for real-time updates
         setInterval(fetchTrafficData, 2000);
         fetchTrafficData();
 
-        // Trigger filter updates instantly on input change
         document.getElementById('nodeSearch').addEventListener('input', fetchTrafficData);
         document.getElementById('filterPedestrians').addEventListener('change', fetchTrafficData);
         document.getElementById('filterCyclists').addEventListener('change', fetchTrafficData);
