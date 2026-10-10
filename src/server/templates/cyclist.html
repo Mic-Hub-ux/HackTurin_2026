@@ -123,20 +123,24 @@ function fetchNodeData() {
                     valCyclists.textContent = counts.cyclists;
                     valAmbulances.textContent = counts.ambulances;
 
-                    // Gestione priorità: Ambulanza (Rosso) -> Traffico Pedonale Elevato (Giallo/Arancione) -> Normale (Verde)
+                    // Gestione dei colori con stili diretti per evitare blocchi di Tailwind
                     if (counts.ambulances > 0) {
-                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-rose-600 text-white flex items-center justify-center gap-2 animate-pulse";
+                        alertBanner.style.backgroundColor = "#e11d48"; // Rosso acceso
+                        alertBanner.style.color = "#ffffff";
                         alertText.textContent = "WARNING: Ambulance Approaching!";
                     } else if (counts.pedestrians > 12) {
-                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-amber-500 text-white flex items-center justify-center gap-2";
+                        alertBanner.style.backgroundColor = "#f59e0b"; // Giallo / Arancione (Caution)
+                        alertBanner.style.color = "#ffffff";
                         alertText.textContent = "Caution: High Pedestrian Density";
                     } else {
-                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-emerald-600 text-white flex items-center justify-center gap-2";
+                        alertBanner.style.backgroundColor = "#10b981"; // Verde (Safe)
+                        alertBanner.style.color = "#ffffff";
                         alertText.textContent = "Intersection Clear & Safe";
                     }
                 })
                 .catch(() => {
-                    alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-slate-700 text-slate-200 flex items-center justify-center gap-2";
+                    alertBanner.style.backgroundColor = "#334155"; // Grigio in attesa
+                    alertBanner.style.color = "#cbd5e1";
                     alertText.textContent = "Waiting for Node Signal...";
                     valPedestrians.textContent = "-";
                     valCyclists.textContent = "-";

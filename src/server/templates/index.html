@@ -168,10 +168,10 @@
     <script>
         lucide.createIcons();
 
-// --- MAP CONFIGURATION (Wikimedia Maps - Pulita, senza icone di negozi o POI superflui) ---
-        const cleanMapLayer = L.tileLayer('https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png', {
+// --- MAP CONFIGURATION (OpenStreetMap Standard Stabile e Garantito) ---
+        const cleanMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; Wikimedia maps | OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap contributors'
         });
 
         const map = L.map('map', { 
@@ -181,7 +181,7 @@
 
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Theme Toggle Logic con filtro CSS dark mode per la mappa pulita
+        // Theme Toggle Logic con filtro CSS dark mode fluido
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeIcon = document.getElementById('themeIcon');
         const mapContainer = document.getElementById('map');
