@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Crossing - Turin Dashboard</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        .popup-content h3 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        .popup-content ul {
+            padding-left: 20px;
+            margin: 0;
+        }
+        .popup-content li {
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Inizializziamo la mappa centrata su Torino
+        var map = L.map('map').setView([45.0703, 7.6869], 14);
+
+        // Aggiungiamo le tile di OpenStreetMap (stile mappa di Torino)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Funzione per caricare i dati dal server Flask e aggiornare i marker sulla mappa
+        function loadTrafficNodes() {
+            fetch('/api/traffic')
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(node => {
+                        let lat = node.coordinates.lat;
+                        let lon = node.coordinates.lon;
+                        let nodeId = node.node_id;
+                        let pedestrians = node.counts.pedestrians || 0;
+                        let cyclists = node.counts.cyclists || 0;
+                        let ambulances = node.counts.ambulances || 0;
+
+                        // Creiamo il contenuto del popup con le icone/dati richiesti
+                        let popupHtml = `
+                            <div class="popup-content">
+                                <h3>📍 Nodo: <b>${nodeId}</b></h3>
+                                <ul>
+                                    <li>🚶‍♂️ <b>Pedoni:</b> ${pedestrians}</li>
+                                    <li>🚴‍♂️ <b>Bici:</b> ${cyclists}</li>
+                                    <li>🚑 <b>Ambulanze:</b> ${ambulances}</li>
+                                </ul>
+                            </div>
+                        `;
+
+                        // Aggiungiamo il cerchietto/marker sulla mappa
+                        L.circleMarker([lat, lon], {
+                            radius: 10,
+                            fillColor: "#ff7800",
+                            color: "#000",
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(map).bindPopup(popupHtml);
+                    });
+                })
+                .catch(err => console.error('Errore nel recupero dati:', err));
+            }
+
+        // Caricamento iniziale e aggiornamento ogni 5 secondi
+        loadTrafficNodes();
+        setInterval(loadTrafficNodes, 5000);
+    </script>
+</body>
+</html>
