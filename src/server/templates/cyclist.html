@@ -14,7 +14,6 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='cyclist.css') }}">
 </head>
 <body class="h-full bg-slate-50 dark:bg-black text-slate-900 dark:text-white font-sans flex flex-col items-center justify-start p-4 transition-colors duration-300">
 
@@ -31,15 +30,12 @@
             </button>
         </header>
 
-        <!-- Node Selector Box -->
+        <!-- Fully Dynamic Node Selector Box -->
         <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-2">
             <label for="nodeSelect" class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Approaching Intersection</label>
             <div class="relative">
                 <select id="nodeSelect" class="w-full py-3 px-4 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl text-sm font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-                    <option value="node_01">Node 01 (Via Po)</option>
-                    <option value="node_02">Node 02 (Via Roma)</option>
-                    <option value="node_03">Node 03 (Corso Vittorio)</option>
-                    <option value="node_04">Node 04 (Piazza Castello)</option>
+                    <option value="">Loading active nodes...</option>
                 </select>
                 <span class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400">
                     <i data-lucide="chevron-down" class="w-4 h-4"></i>
@@ -109,44 +105,61 @@
             lucide.createIcons();
         });
 
-function fetchNodeData() {
-            const selectedNode = nodeSelect.value;
+        // Dynamically populate dropdown only if node count changes, preserving user selection
+        function updateNodesList(nodesData) {
+            const currentSelected = nodeSelect.value;
+            
+            if (nodeSelect.options.length !== nodesData.length) {
+                nodeSelect.innerHTML = '';
+                nodesData.forEach(node => {
+                    const opt = document.createElement('option');
+                    opt.value = node.node_id;
+                    opt.textContent = `Node ${node.node_id.replace('node_', '')}`;
+                    nodeSelect.appendChild(opt);
+                });
 
-            fetch(`/api/traffic/${selectedNode}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("Unavailable");
-                    return res.json();
-                })
+                if (currentSelected && nodesData.some(n => n.node_id === currentSelected)) {
+                    nodeSelect.value = currentSelected;
+                } else if (nodesData.length > 0) {
+                    nodeSelect.value = nodesData[0].node_id;
+                }
+            }
+        }
+
+        function fetchNodeData() {
+            fetch('/api/traffic')
+                .then(res => res.json())
                 .then(data => {
-                    const counts = data.counts;
-                    valPedestrians.textContent = counts.pedestrians;
-                    valCyclists.textContent = counts.cyclists;
-                    valAmbulances.textContent = counts.ambulances;
+                    if (!data || data.length === 0) return;
 
-                    // Gestione forzata del colore del banner
-                    if (counts.ambulances > 0) {
-                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-rose-600 text-white flex items-center justify-center gap-2 animate-pulse";
-                        alertBanner.style.setProperty('background-color', '#e11d48', 'important');
-                        alertText.textContent = "WARNING: Ambulance Approaching!";
-                    } else if (counts.pedestrians > 12) {
-                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-amber-500 text-white flex items-center justify-center gap-2";
-                        alertBanner.style.setProperty('background-color', '#f59e0b', 'important');
-                        alertText.textContent = "Caution: High Pedestrian Density";
-                    } else {
-                        alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-emerald-600 text-white flex items-center justify-center gap-2";
-                        alertBanner.style.setProperty('background-color', '#10b981', 'important');
-                        alertText.textContent = "Intersection Clear & Safe";
+                    // Update dropdown list dynamically from backend
+                    updateNodesList(data);
+
+                    const selectedNodeId = nodeSelect.value || data[0].node_id;
+                    const currentNode = data.find(n => n.node_id === selectedNodeId) || data[0];
+
+                    if (currentNode && currentNode.counts) {
+                        const counts = currentNode.counts;
+                        valPedestrians.textContent = counts.pedestrians;
+                        valCyclists.textContent = counts.cyclists;
+                        valAmbulances.textContent = counts.ambulances;
+
+                        // Force background colors reliably
+                        if (counts.ambulances > 0) {
+                            alertBanner.style.setProperty('background-color', '#e11d48', 'important');
+                            alertText.textContent = "WARNING: Ambulance Approaching!";
+                        } else if (counts.pedestrians > 15) {
+                            alertBanner.style.setProperty('background-color', '#f59e0b', 'important');
+                            alertText.textContent = "Caution: High Pedestrian Density";
+                        } else {
+                            alertBanner.style.setProperty('background-color', '#10b981', 'important');
+                            alertText.textContent = "Intersection Clear & Safe";
+                        }
                     }
                 })
-                .catch(() => {
-                    alertBanner.className = "p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-slate-700 text-slate-200 flex items-center justify-center gap-2";
-                    alertBanner.style.setProperty('background-color', '#334155', 'important');
-                    alertText.textContent = "Waiting for Node Signal...";
-                    valPedestrians.textContent = "-";
-                    valCyclists.textContent = "-";
-                    valAmbulances.textContent = "-";
-                });
+                .catch(err => console.error('Error fetching cyclist data:', err));
         }
+
         setInterval(fetchNodeData, 1500);
         nodeSelect.addEventListener('change', fetchNodeData);
         fetchNodeData();
