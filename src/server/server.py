@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
@@ -9,10 +9,7 @@ traffic_data_store = []
 
 @app.route("/", methods=["GET"])
 def home():
-  return jsonify({
-      "status": "online",
-      "message": "Smart Crossing Backend Server is running!",
-  })
+  return render_template("index.html")
 
 
 @app.route("/api/traffic", methods=["POST"])
