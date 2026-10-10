@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,89 +7,181 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html {
+        body {
             margin: 0;
             padding: 0;
-            height: 100%;
+            display: flex;
+            height: 100vh;
             font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+        }
+        #sidebar {
+            width: 320px;
+            background: #ffffff;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
         #map {
-            width: 100%;
-            height: 100vh;
+            flex-grow: 1;
+            height: 100%;
         }
-        .popup-content h3 {
-            margin: 0 0 8px 0;
-            font-size: 16px;
-            color: #333;
+        h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 1.4rem;
         }
-        .popup-content ul {
-            padding-left: 20px;
-            margin: 0;
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
-        .popup-content li {
-            margin-bottom: 4px;
-            font-size: 14px;
+        .filter-group label {
+            font-weight: bold;
+            color: #34495e;
+            font-size: 0.9rem;
+        }
+        .filter-group input, .filter-group select {
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .checkbox-label {
+            font-weight: normal !important;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .stats-box {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            color: #64748b;
         }
     </style>
 </head>
 <body>
 
+    <!-- Right Sidebar for Filters -->
+    <div id="sidebar">
+        <h2>Smart Crossing Turin</h2>
+        <div class="stats-box">
+            Live dashboard monitoring pedestrian, cyclist, and emergency traffic flows across Turin peer nodes.
+        </div>
+
+        <div class="filter-group">
+            <label for="nodeSearch">Search Peer ID</label>
+            <input type="text" id="nodeSearch" placeholder="e.g. node_01">
+        </div>
+
+        <div class="filter-group">
+            <label>Traffic Categories to Display</label>
+            <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" id="filterPedestrians" checked> Pedestrians</label>
+                <label class="checkbox-label"><input type="checkbox" id="filterCyclists" checked> Cyclists</label>
+                <label class="checkbox-label"><input type="checkbox" id="filterAmbulances" checked> Ambulances</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Left Map Container -->
     <div id="map"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Inizializziamo la mappa centrata su Torino
-        var map = L.map('map').setView([45.0703, 7.6869], 14);
+        // Initialize map centered on Turin
+        const map = L.map('map').setView([45.0703, 7.6869], 14);
 
-        // Aggiungiamo le tile di OpenStreetMap (stile mappa di Torino)
+        // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Funzione per caricare i dati dal server Flask e aggiornare i marker sulla mappa
-        function loadTrafficNodes() {
+        let markers = {};
+
+        function fetchTrafficData() {
             fetch('/api/traffic')
                 .then(response => response.json())
                 .then(data => {
+                    const searchQuery = document.getElementById('nodeSearch').value.toLowerCase();
+                    const showPed = document.getElementById('filterPedestrians').checked;
+                    const showCyc = document.getElementById('filterCyclists').checked;
+                    const showAmb = document.getElementById('filterAmbulances').checked;
+
                     data.forEach(node => {
-                        let lat = node.coordinates.lat;
-                        let lon = node.coordinates.lon;
-                        let nodeId = node.node_id;
-                        let pedestrians = node.counts.pedestrians || 0;
-                        let cyclists = node.counts.cyclists || 0;
-                        let ambulances = node.counts.ambulances || 0;
+                        const nodeId = node.node_id.toLowerCase();
+                        
+                        // Apply Node ID filter
+                        if (searchQuery && !nodeId.includes(searchQuery)) {
+                            if (markers[node.node_id]) {
+                                map.removeLayer(markers[node.node_id]);
+                                delete markers[node.node_id];
+                            }
+                            return;
+                        }
 
-                        // Creiamo il contenuto del popup con le icone/dati richiesti
-                        let popupHtml = `
-                            <div class="popup-content">
-                                <h3>📍 Nodo: <b>${nodeId}</b></h3>
-                                <ul>
-                                    <li>🚶‍♂️ <b>Pedoni:</b> ${pedestrians}</li>
-                                    <li>🚴‍♂️ <b>Bici:</b> ${cyclists}</li>
-                                    <li>🚑 <b>Ambulanze:</b> ${ambulances}</li>
-                                </ul>
-                            </div>
-                        `;
+                        const lat = node.coordinates.lat;
+                        const lon = node.coordinates.lon;
+                        const counts = node.counts;
 
-                        // Aggiungiamo il cerchietto/marker sulla mappa
-                        L.circleMarker([lat, lon], {
-                            radius: 10,
-                            fillColor: "#ff7800",
-                            color: "#000",
-                            weight: 1,
-                            opacity: 1,
-                            fillOpacity: 0.8
-                        }).addTo(map).bindPopup(popupHtml);
+                        // Build filtered metrics string based on checkboxes
+                        let metricsHtml = `<b>Node ID:</b> ${node.node_id}<br><hr style="margin: 5px 0;">`;
+                        if (showPed) metricsHtml += `🚶 Pedestrians: <b>${counts.pedestrians}</b><br>`;
+                        if (showCyc) metricsHtml += `🚴 Cyclists: <b>${counts.cyclists}</b><br>`;
+                        if (showAmb) metricsHtml += `🚑 Ambulances: <b>${counts.ambulances}</b><br>`;
+
+                        if (markers[node.node_id]) {
+                            // Update existing marker position & live-update popup content if open
+                            markers[node.node_id].setLatLng([lat, lon]);
+                            const popup = markers[node.node_id].getPopup();
+                            if (popup) {
+                                popup.setContent(metricsHtml);
+                            }
+                        } else {
+                            // Create new marker
+                            const marker = L.marker([lat, lon]).addTo(map);
+                            marker.bindPopup(metricsHtml);
+
+                            // Open popup on hover (mouseover) and close on mouseout
+                            marker.on('mouseover', function () {
+                                this.openPopup();
+                            });
+                            marker.on('mouseout', function () {
+                                this.closePopup();
+                            });
+
+                            markers[node.node_id] = marker;
+                        }
                     });
                 })
-                .catch(err => console.error('Errore nel recupero dati:', err));
-            }
+                .catch(error => console.error('Error fetching traffic data:', error));
+        }
 
-        // Caricamento iniziale e aggiornamento ogni 5 secondi
-        loadTrafficNodes();
-        setInterval(loadTrafficNodes, 5000);
+        // Poll server every 2 seconds for real-time updates
+        setInterval(fetchTrafficData, 2000);
+        fetchTrafficData();
+
+        // Trigger filter updates instantly on input change
+        document.getElementById('nodeSearch').addEventListener('input', fetchTrafficData);
+        document.getElementById('filterPedestrians').addEventListener('change', fetchTrafficData);
+        document.getElementById('filterCyclists').addEventListener('change', fetchTrafficData);
+        document.getElementById('filterAmbulances').addEventListener('change', fetchTrafficData);
     </script>
 </body>
 </html>
