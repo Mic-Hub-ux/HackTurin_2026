@@ -11,11 +11,7 @@
             darkMode: 'class',
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    // Custom colors to match CartoDB nice dark blue/black
-                    colors: {
-                        'carto-dark': '#1a1a1a' 
-                    }
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
                 }
             }
         }
@@ -26,38 +22,23 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Ensure map fills container */
         #map { height: 100%; width: 100%; }
-        
-        /* --- Leaflet Customization for Dark Mode --- */
-        
-        /* Invert the standard tiles for a basic dark map if not using CartoDB */
-        .dark .leaflet-tile-pane {
-            /* filter: brightness(0.6) invert(1) contrast(3) hue-rotate(180deg) saturate(0.3) !important; */
-        }
-        
-        /* Style Popups to match theme */
         .leaflet-popup-content-wrapper {
-            border-radius: 0.75rem !important; /* rounded-xl */
+            border-radius: 0.75rem !important;
             padding: 0 !important;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
         }
         .dark .leaflet-popup-content-wrapper,
         .dark .leaflet-popup-tip {
-            background-color: #1f2937 !important; /* bg-gray-800 */
-            color: #f3f4f6 !important; /* text-gray-100 */
+            background-color: #1f2937 !important;
+            color: #f3f4f6 !important;
         }
         .leaflet-popup-content {
             margin: 0 !important;
         }
         .leaflet-container a.leaflet-popup-close-button {
-            color: #9ca3af !important; /* text-gray-400 */
+            color: #9ca3af !important;
             padding: 10px 12px 0 0 !important;
-        }
-        .dark .leaflet-control-attribution,
-        .dark .leaflet-control-attribution a {
-            background-color: rgba(26, 26, 26, 0.7) !important;
-            color: #a3a3a3 !important;
         }
     </style>
 </head>
@@ -150,11 +131,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Data Credits (Optional, looks professional) -->
-            <div class="text-center text-xs text-slate-400 dark:text-slate-600 pt-4 border-t border-slate-100 dark:border-slate-800">
-                Map tiles by <a href="https://carto.com/" target="_blank" class="hover:text-blue-500">CartoDB</a> under CC BY 3.0. Data by OpenStreetMap.
-            </div>
         </div>
     </aside>
 
@@ -168,7 +144,7 @@
     <script>
         lucide.createIcons();
 
-// --- MAP CONFIGURATION (OpenStreetMap Standard Stabile e Garantito) ---
+        // 1. Configurazione Mappa OpenStreetMap Stabile
         const cleanMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
@@ -181,7 +157,7 @@
 
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Theme Toggle Logic con filtro CSS dark mode fluido
+        // 2. Logica Dark Mode con Filtro CSS
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeIcon = document.getElementById('themeIcon');
         const mapContainer = document.getElementById('map');
@@ -205,31 +181,17 @@
             }
         });
 
-        // --- MARKER LOGIC ---
-        let markers = {};
-
-// Icona uniforme, ben visibile e dello stesso colore per tutti i nodi
+        // 3. Icona Uniforme e Ben Visibile per tutti i Peer
         const peerIcon = L.divIcon({
-            html: `<div class="w-5 h-5 rounded-full bg-blue-600 border-2 border-white shadow-2xl flex items-center justify-center animate-pulse"></div>`,
+            html: `<div class="w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-xl flex items-center justify-center animate-pulse"></div>`,
             className: '',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
         });
 
-        const iconMap = {
-            pedestrians: createCountIcon('bg-blue-500'),
-            cyclists: createCountIcon('bg-emerald-500'),
-            ambulances: createCountIcon('bg-rose-500')
-        };
+        let markers = {};
 
-        // Determine which icon to show based on priority (Ambulance > Cyclist > Pedestrian)
-        function getMarkerIcon(counts) {
-            if (counts.ambulances > 0) return iconMap.ambulances;
-            if (counts.cyclists > 5) return iconMap.cyclists; // Only highlight if > 5
-            return iconMap.pedestrians;
-        }
-
-function fetchTrafficData() {
+        function fetchTrafficData() {
             fetch('/api/traffic')
                 .then(res => res.json())
                 .then(data => {
@@ -298,7 +260,6 @@ function fetchTrafficData() {
                                 popup.setContent(metricsHtml);
                             }
                         } else {
-                            // Utilizza l'icona uniforme per tutti i marker
                             const marker = L.marker([lat, lon], { icon: peerIcon }).addTo(map);
                             marker.bindPopup(metricsHtml);
 
@@ -314,11 +275,9 @@ function fetchTrafficData() {
                 .catch(err => console.error('Error fetching data:', err));
         }
 
-        // Poll server every 2 seconds for real-time updates
         setInterval(fetchTrafficData, 2000);
         fetchTrafficData();
 
-        // Event Listeners for filters
         document.getElementById('nodeSearch').addEventListener('input', fetchTrafficData);
         document.getElementById('filterPedestrians').addEventListener('change', fetchTrafficData);
         document.getElementById('filterCyclists').addEventListener('change', fetchTrafficData);
