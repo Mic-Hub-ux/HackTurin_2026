@@ -1,12 +1,33 @@
+:root {
+    --bg-color: #f8f9fa;
+    --card-bg: #ffffff;
+    --text-primary: #1d1d1f;
+    --text-secondary: #86868b;
+    --border-color: #d2d2d7;
+    --input-bg: #fbfbfd;
+    --accent-color: #0071e3;
+}
+
+body.dark-mode {
+    --bg-color: #000000;
+    --card-bg: #1c1c1e;
+    --text-primary: #ffffff;
+    --text-secondary: #00bfff;
+    --border-color: #333333;
+    --input-bg: #2c2c2e;
+    --accent-color: #00bfff;
+}
+
 body {
     margin: 0;
     padding: 20px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #000000; /* Pure Black Background */
-    color: #00bfff; /* Neon Blue Text */
+    background-color: var(--bg-color);
+    color: var(--text-primary);
     display: flex;
     flex-direction: column;
     align-items: center;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .container {
@@ -18,62 +39,82 @@ body {
 }
 
 header {
-    text-align: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card-bg);
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transition: background-color 0.3s ease;
 }
 
-h1 {
-    font-size: 1.6rem;
-    margin: 0 0 5px 0;
-    color: #ffffff; /* White Title for contrast */
-    text-transform: uppercase;
-    letter-spacing: 1px;
+.header-text h1 {
+    font-size: 1.2rem;
+    margin: 0 0 2px 0;
+    color: var(--text-primary);
 }
 
 .subtitle {
-    font-size: 0.9rem;
-    color: #1e90ff; /* Dodger Blue subtitle */
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: transform 0.2s;
+}
+
+.theme-toggle-btn:active {
+    transform: scale(0.95);
 }
 
 .node-select-box {
-    background: #1c1c1e; /* Dark Gray Card */
+    background: var(--card-bg);
     padding: 16px;
     border-radius: 14px;
-    border: 1px solid #333; /* Subtle border for dark mode */
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     display: flex;
     flex-direction: column;
     gap: 8px;
+    transition: background-color 0.3s ease;
 }
 
 label {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #a0a0a0; /* Light Gray Label */
+    color: var(--text-secondary);
 }
 
 select {
     padding: 12px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     font-size: 1rem;
-    background: #2c2c2e; /* Dark input background */
-    color: #ffffff;
+    background: var(--input-bg);
+    color: var(--text-primary);
     outline: none;
-}
-
-select:focus {
-    border-color: #00bfff;
 }
 
 /* Safety Alert Banner */
 #alertBanner {
-    background: #00cc66; /* Slightly dimmer green for dark mode safety */
-    color: #000000; /* Black text on alert for contrast */
+    background: #34c759;
+    color: #ffffff;
     padding: 16px;
     border-radius: 14px;
     text-align: center;
-    font-weight: 800;
-    font-size: 1.2rem;
-    box-shadow: 0 4px 15px rgba(0, 191, 255, 0.3); /* subtle blue glow */
+    font-weight: 700;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     transition: background-color 0.3s ease;
 }
 
@@ -84,28 +125,25 @@ select:focus {
 }
 
 .metric-card {
-    background: #1c1c1e; /* Dark Gray Card */
+    background: var(--card-bg);
     padding: 18px;
     border-radius: 14px;
-    border: 1px solid #333;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: background-color 0.3s ease;
 }
 
 .metric-title {
     font-size: 1.1rem;
     font-weight: 500;
-    color: #d0d0d0;
+    color: var(--text-primary);
 }
 
 .metric-value {
-    font-size: 2rem; /* Slightly larger numbers */
+    font-size: 1.8rem;
     font-weight: 700;
-    color: #00bfff; /* Neon Blue Numbers */
-}
-
-/* Specific override for ambulances to keep them noticeable */
-#valAmbulances {
-    color: #ff453a; /* Vibrant Red for danger in dark mode */
+    color: var(--accent-color);
 }

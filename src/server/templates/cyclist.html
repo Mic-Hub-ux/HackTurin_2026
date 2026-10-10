@@ -4,15 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Crossing - Cyclist View</title>
-    <!-- Link to the new dark theme CSS -->
+    <!-- Custom External CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='cyclist.css') }}">
 </head>
 <body>
 
     <div class="container">
         <header>
-            <h1>Efesto: Smart Crossing</h1>
-            <div class="subtitle">Cyclist Safety Assistant</div>
+            <div class="header-text">
+                <h1>Efesto</h1>
+                <div class="subtitle">Cyclist Safety Assistant</div>
+            </div>
+            <!-- Day/Night Toggle Button -->
+            <button id="themeToggleBtn" class="theme-toggle-btn" title="Switch Day/Night Mode">🌙</button>
         </header>
 
         <!-- Node Selector -->
@@ -41,7 +45,7 @@
             </div>
             <div class="metric-card">
                 <div class="metric-title">🚑 Ambulances</div>
-                <div class="metric-value" id="valAmbulances">-</div>
+                <div class="metric-value" id="valAmbulances" style="color: #ff3b30;">-</div>
             </div>
         </div>
     </div>
@@ -52,6 +56,17 @@
         const valPedestrians = document.getElementById('valPedestrians');
         const valCyclists = document.getElementById('valCyclists');
         const valAmbulances = document.getElementById('valAmbulances');
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+        // Theme Toggle Logic
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                themeToggleBtn.textContent = "☀️"; // Switch icon to sun for day mode option
+            } else {
+                themeToggleBtn.textContent = "🌙"; // Switch icon to moon for night mode option
+            }
+        });
 
         function fetchNodeData() {
             const selectedNode = nodeSelect.value;
@@ -69,24 +84,24 @@
                     valCyclists.textContent = counts.cyclists;
                     valAmbulances.textContent = counts.ambulances;
 
-                    // Safety Logic & Alert Generation (Dark Theme Colors)
+                    // Safety Logic & Alert Generation
                     if (counts.ambulances > 0) {
-                        alertBanner.style.backgroundColor = "#ff453a"; // Red
-                        alertBanner.style.color = "#000000";
+                        alertBanner.style.backgroundColor = "#ff3b30"; // Red
+                        alertBanner.style.color = "#ffffff";
                         alertBanner.innerHTML = "🚨 WARNING: Ambulance Approaching!";
                     } else if (counts.pedestrians > 12) {
-                        alertBanner.style.backgroundColor = "#ff9f0a"; // Orange
-                        alertBanner.style.color = "#000000";
+                        alertBanner.style.backgroundColor = "#ff9500"; // Orange
+                        alertBanner.style.color = "#ffffff";
                         alertBanner.innerHTML = "⚠️ Caution: High Pedestrian Traffic";
                     } else {
-                        alertBanner.style.backgroundColor = "#00cc66"; // Green
-                        alertBanner.style.color = "#000000";
+                        alertBanner.style.backgroundColor = "#34c759"; // Green
+                        alertBanner.style.color = "#ffffff";
                         alertBanner.innerHTML = "🟢 Intersection Clear / Safe";
                     }
                 })
                 .catch(error => {
-                    alertBanner.style.backgroundColor = "#3a3a3c"; // Dark Gray
-                    alertBanner.style.color = "#00bfff"; // Neon Blue text
+                    alertBanner.style.backgroundColor = "#86868b";
+                    alertBanner.style.color = "#ffffff";
                     alertBanner.innerHTML = "⏳ Waiting for Node Signal...";
                     valPedestrians.textContent = "-";
                     valCyclists.textContent = "-";
