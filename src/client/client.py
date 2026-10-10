@@ -45,13 +45,15 @@ def client_worker(node_number, start_event, stop_event, result_queue):
 
             dati = {
                 "node_id": node_id,
-                "latitude": latitude,
-                "longitude": longitude,
+                "coordinates": {
+                    "lat": latitude,
+                    "lon": longitude,
+                },
                 "counts": {
                     "pedestrians": random.randint(0, 20),
                     "cyclists": random.randint(0, 10),
-                    "ambulances": random.randint(0, 2)
-                }
+                    "ambulances": random.randint(0, 2),
+                },
             }
 
             inizio = time.perf_counter()
