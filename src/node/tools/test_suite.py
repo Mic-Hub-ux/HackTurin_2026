@@ -582,6 +582,60 @@ def test_inoltro_percorsi():
 
 
 @test
+def test_bracciale():
+    """Canale diretto incrocio -> bracciale (UDP 48100): allarme finche' l'auto e' nella ciclabile."""
+    from wearable import WearableLink
+    rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    rx.bind(("127.0.0.1", 0))
+    rx.settimeout(1.0)
+    porta = rx.getsockname()[1]
+    w = WearableLink({"enabled": True, "devices": [f"127.0.0.1:{porta}"], "broadcast": False}, "incrocio-1")
+
+    def ricevi():
+        ultimo = None
+        try:
+            while True:
+                ultimo = json.loads(rx.recv(512).decode())
+                rx.settimeout(0.05)
+        except OSError:
+            pass
+        rx.settimeout(1.0)
+        return ultimo or {}
+
+    try:
+        t = time.time()
+        now = int(t * 1000)
+        w.push(t)
+        m = ricevi()
+        check("bracciale: keep-alive 'nessun pericolo' dall'incrocio", m.get("t") == "wr" and m.get("on") == 0, m)
+        w.on_hazard({"id": "h1", "kind": "bike_lane_invasion", "severity": 2, "ts": now, "expires": now + 30000,
+                     "action": "new", "actor": {"track": "cam0-5"}}, t)
+        w.set_tracks(["cam0-5"], t)
+        w.push(t)
+        m = ricevi()
+        check("bracciale: auto nella ciclabile -> allarme subito",
+              m.get("on") == 1 and m.get("k") == "bike_lane_invasion" and m.get("n") == "incrocio-1", m)
+        w.push(t + 1.5)
+        m = ricevi()
+        check("bracciale: auto sparita -> fine allarme", m.get("on") == 0, m)
+        w.on_hazard({"id": "h2", "kind": "illegal_stop", "severity": 2, "ts": now, "expires": now + 30000,
+                     "action": "new", "where": {"zone": "crosswalk"}}, t + 2)
+        w.push(t + 2.6)
+        check("bracciale: auto ferma sulle STRISCE non interessa il ciclista", ricevi().get("on") == 0)
+        w.on_hazard({"id": "h3", "kind": "illegal_stop", "severity": 2, "ts": now, "expires": now + 60000,
+                     "action": "new", "where": {"zone": "bike_lane"}}, t + 3)
+        w.push(t + 3)
+        m = ricevi()
+        check("bracciale: auto ferma nella CICLABILE -> allarme", m.get("on") == 1 and m.get("k") == "illegal_stop", m)
+        w.on_hazard({"id": "h3", "kind": "illegal_stop", "action": "cancel", "where": {"zone": "bike_lane"}}, t + 4)
+        w.push(t + 4)
+        check("bracciale: l'auto riparte (cancel) -> fine allarme", ricevi().get("on") == 0)
+    finally:
+        w.close()
+        rx.close()
+
+
+@test
 def test_token_e_env():
     """Token dei dispositivi (SC_TOKEN): scritture protette, letture della dashboard pubbliche; .env -> nodo."""
     import server as srv
@@ -725,7 +779,7 @@ def main():
                test_coda, test_pedoni, test_movimento_vietato, test_semaforo, test_cicli_di_vita,
                test_regole_senza_calibrazione, test_riepiloghi, test_robustezza, test_configurazione,
                test_nodo_e_server, test_led_tempo_reale, test_led_pericolo_si_spegne,
-               test_inoltro_percorsi, test_token_e_env, test_peer_to_peer, test_api_e_pagina_telefono,
+               test_inoltro_percorsi, test_bracciale, test_token_e_env, test_peer_to_peer, test_api_e_pagina_telefono,
                test_fusione_due_camere):
         print(f"\n== {fn.__name__}")
         fn()

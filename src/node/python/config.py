@@ -70,6 +70,11 @@ DEFAULTS = {
     # Peer-to-peer tra incroci e verso i wearable, SENZA server (vedi peer.py e firmware/):
     # UDP multicast sulla rete locale (basta un hotspot, niente internet) e/o ESP-NOW via un
     # ESP32 "radio" collegato in USB (serial.port, es. /dev/ttyACM0): funziona senza nessuna rete.
+    # Bracciale del ciclista (src/firmware/esp32_bracciale): canale DIRETTO incrocio -> dispositivo,
+    # UDP sulla porta 48100. devices = indirizzi IP dei bracciali (li stampano sul Monitor seriale);
+    # broadcast = prova anche 255.255.255.255 (funziona se il container dell'app e' sulla rete della board).
+    "wearable": {"enabled": False, "devices": [], "broadcast": True, "port": 48100, "period_s": 0.5,
+                 "ttl_ms": 2500, "max_s": 30},
     "p2p": {"enabled": False, "group": "239.255.42.99", "port": 47999, "mcast_ttl": 1,
             "peers": [], "key": "", "hops": 2, "heartbeat_s": 5, "bind_port": None,
             "local_alerts": True, "serial": {"port": "", "baud": 115200}},

@@ -37,7 +37,8 @@
   "server": {"url": "https://michubux.pythonanywhere.com", "token": "", "poll_s": 1.0},
   "publish": {"send": {"scene": true}},
   "leds": {"enabled": true, "roles": ["hazard", "cyclist", "person", "emergency"]},
-  "p2p": {"enabled": true, "peers": [], "key": "", "serial": {"port": ""}},
+  "wearable": {"enabled": true, "devices": [], "broadcast": true, "port": 48100},
+  "p2p": {"enabled": false, "peers": [], "key": "", "serial": {"port": ""}},
   "api": {"enabled": false, "port": 8100},
   "data": {"stats_interval_s": 60, "retention_days": 7}
 }

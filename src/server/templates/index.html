@@ -206,10 +206,8 @@
             </section>
 
             <!-- Quick links -->
-            <div class="grid grid-cols-3 gap-2 text-xs font-semibold">
-                <a href="/cyclist" class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-center">Cyclist view</a>
-                <a href="/app?node=incrocio-1" class="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-center">Phone alerts</a>
-                <a href="/console" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-center">Offline console</a>
+            <div class="text-xs font-semibold">
+                <a href="/console" class="block p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-center">Console</a>
             </div>
         </div>
     </aside>
@@ -297,8 +295,7 @@
             { id: 'cyclists', label: 'Cyclists', icon: 'bike', color: 'emerald', on: true },
             { id: 'ambulances', label: 'Ambulances', icon: 'ambulance', color: 'rose', on: true },
             { id: 'vehicles', label: 'Vehicles', icon: 'car', color: 'slate', on: true },
-            { id: 'links', label: 'Intersection links', icon: 'waypoints', color: 'violet', on: true },
-            { id: 'simnodes', label: 'Simulated grid (client.py)', icon: 'grid-3x3', color: 'sky', on: true }
+            { id: 'links', label: 'Intersection links', icon: 'waypoints', color: 'violet', on: true }
         ];
         const layerBox = document.getElementById('layerToggles');
         layerBox.innerHTML = LAYERS.map(l => `
@@ -386,7 +383,6 @@
 
         // Simulated grid nodes keep the original behavior: shown only if a selected category is present.
         function visibleClientNode(n) {
-            if (!layerOn('simnodes')) return false;
             const c = n.counts || {};
             const any = ['pedestrians', 'cyclists', 'ambulances', 'vehicles'].some(k => layerOn(k));
             if (!any) return true;
@@ -540,6 +536,13 @@
             }).join('') || '<p class="text-xs text-slate-400">Waiting for events...</p>';
         }
 
+        function wearHtml(st) {
+            const w = st && st.wearable;
+            if (!w || !w.enabled) return '';
+            return w.alert ? ` &middot; <span class="font-semibold text-rose-500">wristband ALERT (${esc(KIND_EN[w.alert] || w.alert)})</span>`
+                           : ` &middot; wristband &#10003; (${(w.devices || []).filter(d => !d.startsWith('255.')).length || 'broadcast'})`;
+        }
+
         function ledHtml(st) {
             const modes = (st && st.leds && st.leds.modes) || null;
             if (!modes) return '<span class="text-slate-400">no LED data</span>';
@@ -565,7 +568,7 @@
                         <span class="text-[11px] text-slate-400">${n.online ? 'online' : n.source === 'virtual' ? 'virtual' : (n.last_seen ? 'seen ' + ago(n.last_seen) : 'never seen')}</span>
                     </div>
                     ${n.status ? `<p class="text-xs text-slate-500 dark:text-slate-400">${st.fps != null ? st.fps + ' fps' : '- fps'} &middot; ${st.cpu_temp_c != null ? Math.round(st.cpu_temp_c) + '&deg;C' : '-'} &middot; ${st.active_tracks ?? 0} tracks
-                        &middot; server ${st.server_online ? '&#10003;' : '&#10007;'} &middot; p2p ${st.p2p_online ? '&#10003;' : '&#10007;'}</p>
+                        &middot; server ${st.server_online ? '&#10003;' : '&#10007;'}${wearHtml(st)}</p>
                     <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">LEDs ${ledHtml(st)}</div>` : ''}
                     ${warn ? `<div class="text-xs">${warn}</div>` : ''}
                 </button>`;

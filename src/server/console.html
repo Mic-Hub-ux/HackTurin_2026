@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Smart Crossing - centrale</title>
+<script>
+  // tema scelto l'ultima volta (prima del disegno, cosi' la pagina non lampeggia)
+  try { const t = localStorage.getItem("sc_console_theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <style>
   :root {
     --bg: #f3f4f6; --card: #ffffff; --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --soft: #f9fafb;
@@ -11,22 +15,30 @@
     --emergency: #dc2626; --violation: #ea580c; --risk: #d97706; --info: #2563eb;
     --radius: 12px; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 8px rgba(0,0,0,.04);
   }
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --card: #161b22; --ink: #e6edf3; --muted: #8b949e; --line: #2a313b; --soft: #1c222b;
+    --warn: #f0b429; --warn-bg: #3a2e12; --shadow: none;
+  }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #0d1117; --card: #161b22; --ink: #e6edf3; --muted: #8b949e; --line: #2a313b; --soft: #1c222b;
-            --warn: #f0b429; --warn-bg: #3a2e12; --shadow: none; }
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117; --card: #161b22; --ink: #e6edf3; --muted: #8b949e; --line: #2a313b; --soft: #1c222b;
+      --warn: #f0b429; --warn-bg: #3a2e12; --shadow: none;
+    }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px;
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px;
            background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
   .brand { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 10px; }
   .brand small { font-weight: 500; color: var(--muted); font-size: 13px; }
   .logo { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--violation), var(--emergency)); }
+  .right { display: flex; align-items: center; gap: 12px; }
   .conn { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--off); display: inline-block; flex: none; }
   .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
   .dot.bad { background: var(--emergency); }
   .dot.virt { background: var(--virt); }
+  #theme { padding: 5px 9px; font-size: 15px; line-height: 1; }
   #tokenbar { padding: 10px 20px; background: var(--warn-bg); color: var(--warn); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   #tokenbar[hidden] { display: none; }
   main { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 16px; padding: 16px 20px 40px; max-width: 1500px; margin: 0 auto; }
@@ -36,58 +48,59 @@
   .card h2 { margin: 0 0 10px; font-size: 14px; font-weight: 650; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .card h2 .side { font-weight: 400; color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
   .hint { color: var(--muted); font-size: 12.5px; margin: -4px 0 10px; }
-  .muted { color: var(--muted); }
   .empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
+  .small { font-size: 12px; color: var(--muted); }
 
   /* mappa */
   #map svg { width: 100%; height: auto; display: block; }
   .edge { stroke: var(--line); stroke-width: 6; stroke-linecap: round; }
-  .exit { stroke: var(--line); stroke-width: 4; stroke-dasharray: 2 8; stroke-linecap: round; }
-  .vialbl { fill: var(--muted); font-size: 13px; }
-  .nlbl { fill: var(--ink); font-size: 14px; font-weight: 600; }
-  .nsub { fill: var(--muted); font-size: 12px; }
-  .nsub.on { fill: #fff; font-weight: 600; }
+  .nnum { fill: var(--ink); font-size: 15px; font-weight: 700; }
+  .nlbl { fill: var(--ink); font-size: 12px; font-weight: 600; paint-order: stroke; stroke: var(--card); stroke-width: 4px; }
   .ncirc { stroke-width: 4; fill: var(--card); }
   .ncirc.online { stroke: var(--ok); }
   .ncirc.offline { stroke: var(--off); }
-  .ncirc.virtual { stroke: var(--virt); stroke-dasharray: 6 5; }
+  .ncirc.sim { stroke: var(--virt); stroke-dasharray: 5 4; }
+  .ncirc.main { stroke-width: 6; }
   .ncirc.alert-local { fill: var(--violation); }
   .ncirc.alert-emergency { fill: var(--emergency); }
   .ring { fill: none; stroke: var(--risk); stroke-width: 3; animation: ring 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
   @keyframes ring { from { transform: scale(1); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
   .fwd { fill: none; stroke-width: 3.5; stroke-dasharray: 10 8; animation: dash 0.8s linear infinite; }
   @keyframes dash { to { stroke-dashoffset: -18; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 11px; height: 11px; border-radius: 50%; border: 3px solid var(--c); display: inline-block; }
 
-  /* nodi */
-  .nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
-  .node { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--soft); display: flex; flex-direction: column; gap: 8px; }
-  .node.alert { border-color: var(--risk); box-shadow: 0 0 0 2px rgba(217,119,6,.25); }
-  .node-head { display: flex; align-items: center; gap: 8px; }
-  .node-head b { font-size: 14.5px; }
+  /* incroci */
+  .main-node { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--soft); display: flex; flex-direction: column; gap: 9px; }
+  .main-node.alert { border-color: var(--risk); box-shadow: 0 0 0 2px rgba(217,119,6,.25); }
+  .node-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .node-head b { font-size: 15px; }
   .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
-  .tag.virt { color: var(--virt); border-color: var(--virt); }
+  .tag.main { color: var(--ok); border-color: var(--ok); }
   .tag.sim { color: var(--virt); border-color: var(--virt); }
   .tag.end { color: var(--muted); }
-  .node-sub { color: var(--muted); font-size: 12.5px; }
-  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .metric { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 5px 7px; }
-  .metric .v { font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; }
-  .metric .k { color: var(--muted); font-size: 11px; }
-  .leds { display: flex; gap: 12px; align-items: flex-end; }
-  .led { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; color: var(--muted); }
-  .led i { width: 14px; height: 14px; border-radius: 50%; background: var(--line); display: block; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .metric { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .metric .v { font-weight: 650; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .metric .k { color: var(--muted); font-size: 11.5px; }
+  .leds { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+  .led { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); }
+  .led i { width: 15px; height: 15px; border-radius: 50%; background: var(--line); display: block; }
   .led.m1 i, .led.m2 i, .led.m3 i { background: var(--c); box-shadow: 0 0 8px var(--c); }
   .led.m2 i { animation: blink 1s steps(1) infinite; }
   .led.m3 i { animation: blink .25s steps(1) infinite; }
   @keyframes blink { 50% { background: var(--line); box-shadow: none; } }
-  .warns { display: flex; flex-direction: column; gap: 3px; }
-  .warns div { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 3px 8px; font-size: 12px; }
+  .warns div { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 3px 8px; font-size: 12px; margin-top: 3px; }
   .incoming { border-left: 4px solid var(--c, var(--risk)); background: var(--card); border-radius: 6px; padding: 6px 8px; font-size: 12.5px; }
-  .incoming b { display: block; }
-  .small { font-size: 12px; color: var(--muted); }
+  .others { margin-top: 12px; display: flex; flex-direction: column; }
+  .other { display: flex; align-items: center; gap: 8px; padding: 7px 2px; border-top: 1px solid var(--line); font-size: 13px; }
+  .other .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .other .st { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .other .st.alert { color: var(--violation); font-weight: 600; }
 
-  /* feed */
-  #feed { display: flex; flex-direction: column; gap: 6px; max-height: 560px; overflow-y: auto; padding-right: 4px; }
+  /* eventi */
+  #feed { display: flex; flex-direction: column; gap: 6px; max-height: 480px; overflow-y: auto; padding-right: 4px; }
   .ev { display: grid; grid-template-columns: 64px 1fr; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--soft);
         border-left: 4px solid var(--c, var(--off)); }
   .ev.fresh { animation: fresh 2.5s ease-out; }
@@ -108,50 +121,40 @@
   button.primary { background: var(--violation); border-color: var(--violation); color: #fff; font-weight: 600; width: 100%; padding: 10px; }
   button.primary:hover { filter: brightness(1.07); }
   button.mini { padding: 3px 9px; font-size: 12px; }
-  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
   .seg button.on { border-color: var(--violation); color: var(--violation); font-weight: 600; }
-  .route { font-size: 13px; background: var(--soft); border-radius: 8px; padding: 7px 9px; margin-bottom: 10px; }
-  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .quick button { font-size: 12px; padding: 5px 9px; }
   .msg { font-size: 13px; margin-top: 8px; min-height: 18px; }
   .msg.ok { color: var(--ok); } .msg.err { color: var(--emergency); }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-  /* liste e tabelle */
+  /* liste */
   .act { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); }
   .act:last-child { border-bottom: 0; }
   .act .bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--c); }
   .act .body { flex: 1; min-width: 0; }
-  .bars { display: flex; flex-direction: column; gap: 6px; }
+  .bars { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .barrow { display: grid; grid-template-columns: minmax(0, 1.3fr) 2fr 36px; gap: 8px; align-items: center; font-size: 12.5px; }
   .barrow .track { height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
   .barrow .fill { height: 100%; background: var(--c); border-radius: 4px; }
   .barrow .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--line); }
-  td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .fw { display: grid; grid-template-columns: 62px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .fw:last-child { border-bottom: 0; }
+  .fw .t { color: var(--muted); font-variant-numeric: tabular-nums; }
   .st-ok { color: var(--ok); } .st-wait { color: var(--risk); } .st-virt { color: var(--virt); }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
-  .chip { background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; }
-  .chip b { font-variant-numeric: tabular-nums; }
-  .cam h3 { font-size: 13px; margin: 12px 0 2px; }
-  .scroll { overflow-x: auto; }
-  /* telefono: in fondo, cosi' vince sulle regole sopra */
   @media (max-width: 600px) {
     header { padding: 10px 16px; }
     .brand small, #conn-time, .card h2 .side.hide-narrow { display: none; }
     .brand { font-size: 15px; white-space: nowrap; }
     .conn { font-size: 12px; white-space: nowrap; }
-    .metrics, .totals { grid-template-columns: repeat(2, 1fr); }
   }
 </style>
 </head>
 <body>
 <header>
   <div class="brand"><span class="logo"></span>Smart Crossing <small>centrale degli incroci</small></div>
-  <div class="conn"><span id="conn-dot" class="dot"></span><span id="conn-txt">connessione...</span><span id="conn-time"></span></div>
+  <div class="right">
+    <div class="conn"><span id="conn-dot" class="dot"></span><span id="conn-txt">connessione...</span><span id="conn-time"></span></div>
+    <button id="theme" title="tema chiaro / scuro">🌙</button>
+  </div>
 </header>
 <div id="tokenbar" hidden>
   Questa azione richiede il token (SC_TOKEN nel .env del server):
@@ -162,13 +165,25 @@
 <main>
   <div class="col">
     <section class="card" id="map">
-      <h2>Rete di incroci <span class="side hide-narrow">le frecce sono i pericoli inoltrati negli ultimi 10 s</span></h2>
+      <h2>Rete di incroci <span class="side hide-narrow" id="map-side"></span></h2>
       <div id="map-svg" class="empty">caricamento...</div>
+      <div class="legend">
+        <span style="--c:var(--ok)"><i></i>board collegata</span>
+        <span style="--c:var(--virt)"><i></i>simulato</span>
+        <span style="--c:var(--off)"><i></i>offline</span>
+        <span>frecce = pericoli inoltrati negli ultimi 10 s</span>
+      </div>
     </section>
 
     <section class="card">
       <h2>Incroci <span class="side" id="nodes-side"></span></h2>
-      <div id="nodes" class="nodes"><div class="empty">caricamento...</div></div>
+      <div id="main-node"><div class="empty">caricamento...</div></div>
+      <div id="others" class="others"></div>
+    </section>
+
+    <section class="card">
+      <h2>Ultimo periodo <span class="side" id="stats-side"></span></h2>
+      <div id="stats"><div class="empty">Nessuna statistica ancora.</div></div>
     </section>
 
     <section class="card">
@@ -177,18 +192,12 @@
       </h2>
       <div id="feed"><div class="empty" id="feed-empty">Nessun evento per ora.</div></div>
     </section>
-
-    <section class="card">
-      <h2>Statistiche dell'ultimo periodo <span class="side"><select id="stats-node" style="width:auto"></select></span></h2>
-      <div id="stats"><div class="empty">Nessuna statistica ancora.</div></div>
-    </section>
   </div>
 
   <div class="col">
     <section class="card" id="sim">
       <h2>Simula pericolo</h2>
-      <p class="hint">Finge che un incrocio vicino abbia visto un pericolo: il server lo inoltra secondo la
-        direzione del veicolo e la board che lo riceve accende i LED.</p>
+      <p class="hint">Finge che un incrocio veda un pericolo: il server lo inoltra lungo la direzione del veicolo.</p>
       <label class="f">Incrocio che vede il pericolo <select id="sim-from"></select></label>
       <label class="f">Il veicolo si muove verso <select id="sim-towards"></select></label>
       <label class="f">Consegna a <select id="sim-to"></select></label>
@@ -197,9 +206,7 @@
       <div class="seg" id="sim-sev">
         <button data-v="1">1 bassa</button><button data-v="2" class="on">2 media</button><button data-v="3">3 alta</button>
       </div>
-      <div class="route" id="sim-route"></div>
       <button class="primary" id="sim-go">Simula pericolo</button>
-      <div class="quick" id="sim-quick"></div>
       <div class="msg" id="sim-msg"></div>
     </section>
 
@@ -209,14 +216,14 @@
     </section>
 
     <section class="card">
-      <h2>Conteggi <span class="side">dall'avvio del server</span></h2>
-      <div class="totals" id="totals"></div>
-      <div class="bars" id="counts"></div>
+      <h2>Inoltri ai vicini <span class="side">ultimi 5</span></h2>
+      <div id="forwards"><div class="empty">Nessun inoltro per ora.</div></div>
     </section>
 
     <section class="card">
-      <h2>Inoltri ai vicini <span class="side" id="fwd-n"></span></h2>
-      <div class="scroll" id="forwards"><div class="empty">Nessun inoltro per ora.</div></div>
+      <h2>Conteggi <span class="side">dall'avvio del server</span></h2>
+      <div class="metrics" id="totals"></div>
+      <div class="bars" id="counts"></div>
     </section>
   </div>
 </main>
@@ -224,13 +231,15 @@
 <script>
 "use strict";
 const CLASSI = { vehicle: "veicolo", person: "pedone", cyclist: "ciclista", emergency: "mezzo di soccorso" };
-const CLASSI_PL = { vehicle: "Veicoli", person: "Pedoni", cyclist: "Ciclisti", emergency: "Soccorso" };
 const CAT_IT = { emergency: "emergenza", violation: "infrazione", risk: "rischio", info: "info" };
-const RUOLI = { local: ["locale", "var(--violation)"], remote: ["vicini", "var(--risk)"],
-                emergency: ["soccorso", "var(--emergency)"], status: ["server", "var(--ok)"],
-                any: ["pericolo", "var(--violation)"], none: ["-", "var(--off)"] };
-const S = { token: "", evAfter: 0, evInit: false, kinds: {}, kindList: [], nodes: [], byId: {}, fwu: true,
-            offset: 0, lastOk: 0, summary: null, fwds: [], sev: 2, statsNode: "", simReady: false };
+// nomi e colori dei LED della board, secondo il ruolo (config leds.roles)
+const RUOLI = { hazard: ["pericolo", "#ef4444"], cyclist: ["ciclista", "#22c55e"], person: ["pedone", "#facc15"],
+                emergency: ["soccorso", "#3b82f6"], vehicle: ["veicolo", "#a855f7"], local: ["locale", "var(--violation)"],
+                remote: ["vicini", "var(--risk)"], status: ["server", "var(--ok)"], any: ["pericolo", "var(--violation)"],
+                none: ["-", "var(--off)"] };
+const DIREZIONI = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ovest", "ovest", "nord-ovest"];
+const S = { token: "", evAfter: 0, evInit: false, kinds: {}, kindList: [], nodes: [], byId: {},
+            offset: 0, lastOk: 0, summary: null, fwds: [], sev: 2, simReady: false, mainId: null };
 const $ = (s) => document.querySelector(s);
 
 function esc(v) {
@@ -317,6 +326,20 @@ function updateConn() {
   $("#conn-time").textContent = " · " + new Date().toLocaleTimeString("it-IT");
 }
 
+/* ------------------------------------------------------------------ tema */
+
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function showThemeIcon() { $("#theme").textContent = isDark() ? "☀️" : "🌙"; }
+$("#theme").onclick = () => {
+  const t = isDark() ? "light" : "dark";
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("sc_console_theme", t); } catch (e) {}
+  showThemeIcon();
+};
+
 /* ------------------------------------------------------------------ eventi */
 
 function addEvent(it, fresh) {
@@ -332,33 +355,18 @@ function addEvent(it, fresh) {
     title = esc(kindLabel(m.kind));
     badges += cancel ? '<span class="tag end">terminato</span>' : `<span class="sev">gravità ${esc(m.severity)}</span>`;
     if (it.simulated || m.simulated) badges += '<span class="tag sim">simulato</span>';
-    if (t === "remote_hazard") {
-      badges += '<span class="tag">da un vicino</span>';
-      meta.push(esc(nodeName(it.node)) + " ha ricevuto da " + esc(nodeName(m.from_node)));
-    } else {
-      meta.push(esc(nodeName(it.node)) + (m.camera && m.camera !== "sim" ? " · " + esc(m.camera) : ""));
-    }
-    if (a.class) meta.push(esc(CLASSI[a.class] || a.class) + (a.track ? " #" + esc(a.track) : ""));
+    if (t === "remote_hazard") meta.push(esc(nodeName(it.node)) + " da " + esc(nodeName(m.from_node)));
+    else meta.push(esc(nodeName(it.node)));
+    if (a.class) meta.push(esc(CLASSI[a.class] || a.class));
     if (a.towards || m.towards) meta.push("verso «" + esc(a.towards || m.towards) + "»");
-    if (a.speed_kmh != null) meta.push(esc(a.speed_kmh) + " km/h");
-    else if (a.speed_rel != null) meta.push("vel. relativa " + esc(a.speed_rel));
-    if (m.where && m.where.zone) meta.push("zona " + esc(m.where.zone));
-    if (m.where && m.where.line) meta.push("linea " + esc(m.where.line));
-    if (cancel && m.details && m.details.duration_s != null) meta.push("durata " + dur(m.details.duration_s));
     const fw = it.forwarded_to || [];
     if (fw.length) meta.push("<b>" + (cancel ? "fine inoltrata a " : "inoltrato a ") + fw.map((x) => esc(nodeName(x))).join(", ") + "</b>");
-    else if (t === "hazard" && !cancel && m.propagate === false) meta.push("solo locale");
     el.className = "ev cat-" + cat + (cancel ? " cancel" : "");
   } else {
     if (!$("#show-tracks").checked) return;
     if (t === "track") {
       title = "Passaggio " + esc(CLASSI[m.class] || m.class || "");
       if (m.from || m.to) meta.push(esc(m.from || "?") + " → " + esc(m.to || "?"));
-      if (m.duration_s != null) meta.push(dur(m.duration_s));
-      const sp = m.speed_kmh || m.speed_rel;
-      if (sp && sp.avg != null) meta.push((m.speed_kmh ? num(sp.avg, 0) + " km/h" : "vel. rel. " + num(sp.avg, 2)));
-      if (m.crosswalk_crossing) meta.push("strisce " + esc(m.crosswalk_crossing.direction || ""));
-      if (m.events && m.events.length) meta.push("eventi: " + m.events.map((k) => esc(kindLabel(k))).join(", "));
     } else if (t === "movement") {
       title = "Movimento tra camere " + esc(CLASSI[m.class] || m.class || "");
       meta.push(esc(m.from) + " → " + esc(m.to));
@@ -375,11 +383,11 @@ function addEvent(it, fresh) {
   const empty = $("#feed-empty");
   if (empty) empty.remove();
   feed.insertBefore(el, feed.firstChild);
-  while (feed.children.length > 150) feed.removeChild(feed.lastChild);
+  while (feed.children.length > 100) feed.removeChild(feed.lastChild);
 }
 
 async function pollEvents() {
-  const q = S.evInit ? "after=" + S.evAfter + "&limit=200" : "limit=60";
+  const q = S.evInit ? "after=" + S.evAfter + "&limit=200" : "limit=40";
   const d = await api("/api/events?" + q + "&exclude=scene");
   if (S.evInit && d.last < S.evAfter) $("#feed").innerHTML = ""; // server ripartito con un database nuovo
   for (const it of d.messages) addEvent(it, S.evInit);
@@ -387,7 +395,15 @@ async function pollEvents() {
   S.evInit = true;
 }
 
-/* ------------------------------------------------------------------ nodi e mappa */
+/* ------------------------------------------------------------------ incroci */
+
+// la board vera: un incrocio che manda il suo stato (gli altri sono simulati dal client.py o dalla dashboard)
+function findMain() {
+  const real = S.nodes.filter((n) => n.status || n.last_seen);
+  const on = real.filter((n) => n.online);
+  return (on[0] || real[0] || null);
+}
+function isSim(n) { return n.id !== S.mainId && !n.status; }
 
 function ledsHtml(leds) {
   if (!leds || !Array.isArray(leds.modes)) return "";
@@ -400,138 +416,154 @@ function ledsHtml(leds) {
   }).join("") + "</div>";
 }
 
-function nodeCard(n) {
-  const st = n.status || {};
-  const cam = Object.values(st.cameras || {})[0] || {};
-  const sys = st.system || {};
-  const local = (S.summary ? S.summary.active : []).filter((a) => a.node === n.id);
-  const incoming = n.active_remote || [];
-  let dot = "dot", stato;
-  if (n.online) { dot += " ok"; stato = "online · visto " + ago(n.last_seen); }
-  else if (n.virtual) { dot += " virt"; stato = "virtuale (nessuna board) · si simula dalla dashboard"; }
-  else stato = n.last_seen ? "offline · visto " + ago(n.last_seen) : "mai visto";
-  if (n.ip && !n.virtual) stato += " · " + esc(n.ip);
-  let h = `<div class="node${incoming.length || local.length ? " alert" : ""}">
-    <div class="node-head"><span class="${dot}"></span><b>${esc(n.name)}</b>
-      ${n.name !== n.id ? `<span class="small">${esc(n.id)}</span>` : ""}
-      ${n.virtual ? '<span class="tag virt">virtuale</span>' : ""}${n.in_topology ? "" : '<span class="tag">fuori topologia</span>'}</div>
-    <div class="node-sub">${stato}</div>`;
-  if (n.status) {
-    h += `<div class="metrics">
-      <div class="metric"><div class="v">${num(cam.fps, 1)}</div><div class="k">FPS</div></div>
-      <div class="metric"><div class="v">${sys.cpu_temp_c != null ? num(sys.cpu_temp_c, 0) + "°" : "-"}</div><div class="k">temperatura</div></div>
-      <div class="metric"><div class="v">${num(st.active_tracks)}</div><div class="k">tracce attive</div></div>
-      <div class="metric"><div class="v">${num(st.outbox)}</div><div class="k">coda invio</div></div>
-    </div>`;
-    if (st.leds && st.leds.modes) h += '<div class="small">LED della board (dall\'ultimo stato ricevuto)</div>' + ledsHtml(st.leds);
-    const w = st.warnings || [];
-    if (w.length) h += '<div class="warns">' + w.map((x) => `<div>${esc(x)}</div>`).join("") + "</div>";
-  }
-  // stessi pericoli raggruppati: la scheda resta corta anche con tanti eventi uguali
-  for (const g of groupBy(local, (a) => a.kind)) {
-    const a = g[0], fw = [...new Set(g.flatMap((x) => x.forwarded_to))];
-    h += `<div class="incoming cat-${esc(a.category || kindCat(a.kind))}"><b>Visto qui: ${esc(kindLabel(a.kind))}${g.length > 1 ? " ×" + g.length : ""}</b>
-      gravità ${Math.max(...g.map((x) => x.severity || 1))}${g.every((x) => x.simulated) ? " · simulato" : ""}${fw.length ? " · inoltrato a " + fw.map((x) => esc(nodeName(x))).join(", ") : ""}</div>`;
-  }
-  for (const g of groupBy(incoming, (a) => a.kind + "|" + a.from_node)) {
-    const a = g[g.length - 1];
-    const left = Math.max(0, Math.round((Math.max(...g.map((x) => x.expires || 0)) - serverNow()) / 1000));
-    h += `<div class="incoming cat-${esc(a.category || kindCat(a.kind))}"><b>In arrivo da ${esc(nodeName(a.from_node))}: ${esc(kindLabel(a.kind))}${g.length > 1 ? " ×" + g.length : ""}</b>
-      gravità ${Math.max(...g.map((x) => x.severity || 1))}${a.arrives_from ? " · arriva dalla via «" + esc(a.arrives_from) + "»" : ""} · scade tra ${left} s${a.simulated ? " · simulato" : ""}</div>`;
-  }
-  const nb = Object.entries(n.neighbors || {});
-  if (nb.length) h += `<div class="small">Vicini: ${nb.map(([v, d]) => "«" + esc(v) + "» → " + (d ? esc(nodeName(d)) : "fuori rete")).join(" · ")}</div>`;
-  const ib = n.inbox || {};
-  const c = n.counts || {};
-  let foot = `Casella: ${ib.total || 0} messaggi`;
-  if (ib.pending) foot += `, ${ib.pending} non ancora letti`;
-  if (n.polling) foot += " · la board legge la casella";
-  if (c.hazard || c.track) foot += ` · ricevuti: ${c.hazard || 0} pericoli, ${c.track || 0} passaggi`;
-  h += `<div class="small">${foot}</div></div>`;
-  return h;
-}
-
 function groupBy(list, key) {
   const m = new Map();
   for (const x of list) { const k = key(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); }
   return [...m.values()];
 }
 
-function layout(nodes) {
-  const pos = {};
-  const free = nodes.filter((n) => !Array.isArray(n.pos));
-  const placed = nodes.length - free.length;
-  nodes.forEach((n) => { if (Array.isArray(n.pos)) pos[n.id] = [n.pos[0], n.pos[1]]; });
-  free.forEach((n, i) => {  // nodi senza "pos" in topology.json: in fila (sotto gli altri, se ce ne sono)
-    pos[n.id] = [(i + 1) / (free.length + 1), placed ? 0.92 : 0.5];
+function mainCard(n) {
+  const st = n.status || {};
+  const cam = Object.values(st.cameras || {})[0] || {};
+  const sys = st.system || {};
+  const local = (S.summary ? S.summary.active : []).filter((a) => a.node === n.id);
+  const incoming = n.active_remote || [];
+  const stato = n.online ? "online · aggiornato " + ago(n.last_seen) : (n.last_seen ? "offline · visto " + ago(n.last_seen) : "mai visto");
+  let h = `<div class="main-node${incoming.length || local.length ? " alert" : ""}">
+    <div class="node-head"><span class="dot${n.online ? " ok" : ""}"></span><b>${esc(n.name)}</b>
+      <span class="small">${esc(n.id)}</span><span class="tag main">board</span></div>
+    <div class="small">${stato}</div>`;
+  if (n.status) {
+    h += `<div class="metrics">
+      <div class="metric"><div class="v">${num(cam.fps, 1)}</div><div class="k">FPS camera</div></div>
+      <div class="metric"><div class="v">${sys.cpu_temp_c != null ? num(sys.cpu_temp_c, 0) + "°" : "-"}</div><div class="k">temperatura</div></div>
+      <div class="metric"><div class="v">${num(st.active_tracks)}</div><div class="k">oggetti in vista</div></div>
+    </div>`;
+    if (st.leds && st.leds.modes) h += ledsHtml(st.leds);
+    const w = st.wearable;
+    if (w && w.enabled) h += `<div class="small">Bracciale del ciclista: ${w.alert ? '<b style="color:var(--violation)">ALLARME · ' + esc(kindLabel(w.alert)) + "</b>" : "collegato, nessun allarme"}</div>`;
+    const warns = st.warnings || [];
+    if (warns.length) h += '<div class="warns">' + warns.map((x) => `<div>${esc(x)}</div>`).join("") + "</div>";
+  }
+  for (const g of groupBy(local, (a) => a.kind)) {
+    const a = g[0];
+    h += `<div class="incoming cat-${esc(a.category || kindCat(a.kind))}"><b>Visto qui: ${esc(kindLabel(a.kind))}${g.length > 1 ? " ×" + g.length : ""}</b></div>`;
+  }
+  for (const g of groupBy(incoming, (a) => a.kind + "|" + a.from_node)) {
+    const a = g[g.length - 1];
+    h += `<div class="incoming cat-${esc(a.category || kindCat(a.kind))}"><b>In arrivo da ${esc(nodeName(a.from_node))}: ${esc(kindLabel(a.kind))}</b></div>`;
+  }
+  return h + "</div>";
+}
+
+function otherRow(n) {
+  const local = (S.summary ? S.summary.active : []).filter((a) => a.node === n.id);
+  const inc = n.active_remote || [];
+  let st, cls = "st";
+  if (local.length) { st = "vede: " + kindLabel(local[0].kind); cls += " alert"; }
+  else if (inc.length) { st = "in arrivo: " + kindLabel(inc[inc.length - 1].kind); cls += " alert"; }
+  else st = isSim(n) ? "simulato" : (n.online ? "online" : "offline");
+  const dot = n.online && !isSim(n) ? "dot ok" : isSim(n) ? "dot virt" : "dot";
+  return `<div class="other"><span class="${dot}"></span><span class="nm">${esc(n.name)} <span class="small">${esc(n.id)}</span></span><span class="${cls}">${esc(st)}</span></div>`;
+}
+
+function renderNodes() {
+  const main = S.byId[S.mainId];
+  setHtml($("#main-node"), main ? mainCard(main) : '<div class="empty">Nessuna board collegata: accendete la UNO Q (server.url nel config).</div>');
+  const others = S.nodes.filter((n) => n.id !== S.mainId);
+  setHtml($("#others"), others.map(otherRow).join(""));
+  $("#nodes-side").textContent = main ? `board: ${main.id} · ${others.length} altri incroci` : `${S.nodes.length} incroci`;
+}
+
+/* ------------------------------------------------------------------ mappa */
+
+// posizioni dalle coordinate di topology.json (lat/lon), poi i nodi troppo vicini vengono allontanati
+function layout(nodes, W, H, M, minD) {
+  const P = {};
+  const geo = nodes.filter((n) => n.coordinates && n.coordinates.lat != null);
+  if (geo.length >= 2) {
+    const lat0 = geo.reduce((s, n) => s + n.coordinates.lat, 0) / geo.length;
+    const k = Math.cos(lat0 * Math.PI / 180);
+    const xy = geo.map((n) => [n.id, n.coordinates.lon * k, -n.coordinates.lat]);
+    const xs = xy.map((p) => p[1]), ys = xy.map((p) => p[2]);
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    const sx = (Math.max(...xs) - x0) || 1e-9, sy = (Math.max(...ys) - y0) || 1e-9;
+    const sc = Math.min((W - 2 * M) / sx, (H - 2 * M) / sy);
+    const ox = (W - sx * sc) / 2, oy = (H - sy * sc) / 2;
+    xy.forEach(([id, x, y]) => { P[id] = [ox + (x - x0) * sc, oy + (y - y0) * sc]; });
+  }
+  const free = nodes.filter((n) => !P[n.id]);
+  free.forEach((n, i) => {
+    P[n.id] = Array.isArray(n.pos) ? [M + n.pos[0] * (W - 2 * M), M + n.pos[1] * (H - 2 * M)]
+                                   : [M + (i + 1) / (free.length + 1) * (W - 2 * M), H - M];
   });
-  return pos;
+  const ids = Object.keys(P);
+  for (let it = 0; it < 300; it++) {  // allontana i nodi che si sovrappongono
+    let moved = false;
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      const a = P[ids[i]], b = P[ids[j]];
+      let dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy);
+      if (d >= minD) continue;
+      if (d < 0.01) { dx = 1; dy = 0.3; d = Math.hypot(dx, dy); }
+      const push = (minD - d) / 2, ux = dx / d, uy = dy / d;
+      a[0] -= ux * push; a[1] -= uy * push; b[0] += ux * push; b[1] += uy * push;
+      moved = true;
+    }
+    for (const id of ids) {
+      P[id][0] = Math.min(W - M, Math.max(M, P[id][0]));
+      P[id][1] = Math.min(H - M, Math.max(M, P[id][1]));
+    }
+    if (!moved) break;
+  }
+  return P;
 }
 
 function renderMap() {
-  const nodes = S.nodes;
+  const nodes = S.nodes.filter((n) => n.in_topology !== false);
   const box = $("#map-svg");
   if (!nodes.length) { setHtml(box, '<div class="empty">Nessun incrocio in topology.json.</div>'); return; }
-  // viewBox grande quanto la scheda (scritte leggibili); sul telefono la mappa si gira in verticale
-  const W = Math.max(280, Math.round(box.clientWidth || 800));
+  const W = Math.max(300, Math.round(box.clientWidth || 800));
   const narrow = W < 560;
-  const R = narrow ? 22 : 30, M = narrow ? 46 : 70;
-  const H = narrow ? Math.max(300, 130 * nodes.length) : 200;
-  const p01 = layout(nodes);
-  const P = {};
-  for (const id in p01) {
-    const [x, y] = p01[id];
-    P[id] = narrow ? [W * 0.36 + (y - 0.5) * (W - 2 * M), M + x * (H - 2 * M)] : [M + x * (W - 2 * M), 34 + y * (H - 88)];
+  const R = narrow ? 15 : 19, M = narrow ? 34 : 48;
+  // altezza dalle proporzioni reali della zona (piu' larga che alta -> mappa bassa)
+  const geo = nodes.filter((n) => n.coordinates && n.coordinates.lat != null);
+  let ratio = 0.55;
+  if (geo.length >= 2) {
+    const lat0 = geo[0].coordinates.lat, k = Math.cos(lat0 * Math.PI / 180);
+    const w = Math.max(...geo.map((n) => n.coordinates.lon * k)) - Math.min(...geo.map((n) => n.coordinates.lon * k));
+    const h = Math.max(...geo.map((n) => n.coordinates.lat)) - Math.min(...geo.map((n) => n.coordinates.lat));
+    if (w > 0) ratio = h / w;
   }
-  const cx = Object.values(P).reduce((s, p) => s + p[0], 0) / nodes.length;
-  const cy = Object.values(P).reduce((s, p) => s + p[1], 0) / nodes.length;
-  let edges = "", labels = "", circles = "", arrows = "";
-  const done = {};
+  const H = Math.round(Math.min(narrow ? 520 : 440, Math.max(240, W * ratio + 2 * M)));
+  const P = layout(nodes, W, H, M, narrow ? 2 * R + 34 : 2 * R + 60);
   box.classList.remove("empty");
+
+  let edges = "", circles = "", arrows = "";
+  const done = {};
   for (const n of nodes) {
-    const exits = [];
-    for (const [via, dest] of Object.entries(n.neighbors || {})) {
-      const a = P[n.id], b = dest ? P[dest] : null;
-      if (b) {
-        const key = [n.id, dest].sort().join("|");
-        if (!done[key]) { done[key] = 1; edges += `<line class="edge" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`; }
-        // nome della via accanto al tratto, spostato di lato rispetto alla strada
-        const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-        const t = Math.min(0.3, (R + 26) / l);
-        const px = -(b[1] - a[1]) / l, py = (b[0] - a[0]) / l;
-        const side = py > 0 || (py === 0 && px > 0) ? -1 : 1;  // sopra (orizzontale) o a sinistra (verticale)
-        const lx = a[0] + (b[0] - a[0]) * t + px * 14 * side, ly = a[1] + (b[1] - a[1]) * t + py * 14 * side + 4;
-        labels += `<text class="vialbl" x="${lx}" y="${ly}" text-anchor="${narrow ? "end" : "middle"}">${esc(via)}</text>`;
-      } else exits.push(via);
+    for (const dest of Object.values(n.neighbors || {})) {
+      if (!dest || !P[dest] || dest === n.id) continue;
+      const key = [n.id, dest].sort().join("|");
+      if (done[key]) continue;
+      done[key] = 1;
+      const a = P[n.id], b = P[dest];
+      edges += `<line class="edge" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"><title>${esc(nodeName(n.id))} ↔ ${esc(nodeName(dest))}</title></line>`;
     }
-    exits.forEach((via, i) => {  // via che esce dalla rete: tratteggio verso l'esterno
-      const a = P[n.id];
-      let dx = a[0] - cx, dy = a[1] - cy;
-      const l = Math.hypot(dx, dy) || 1;
-      dx /= l; dy /= l;
-      if (!Math.hypot(a[0] - cx, a[1] - cy)) { dx = 0; dy = 1; }
-      const ang = Math.atan2(dy, dx) + (i - (exits.length - 1) / 2) * 0.6;
-      const L = M - 6, ex = a[0] + Math.cos(ang) * L, ey = a[1] + Math.sin(ang) * L;
-      edges += `<line class="exit" x1="${a[0]}" y1="${a[1]}" x2="${ex}" y2="${ey}"/>`;
-      const lt = narrow ? [a[0] - 14, a[1] + Math.sin(ang) * (R + 12) + 4] : [a[0] + Math.cos(ang) * L * 0.75, a[1] - 12];
-      labels += `<text class="vialbl" x="${lt[0]}" y="${lt[1]}" text-anchor="${narrow ? "end" : "middle"}">${esc(via)}</text>`;
-    });
   }
   const active = S.summary ? S.summary.active : [];
   for (const n of nodes) {
     const a = P[n.id];
     const loc = active.filter((x) => x.node === n.id);
-    let cls = "ncirc " + (n.online ? "online" : n.virtual ? "virtual" : "offline");
+    const main = n.id === S.mainId;
+    let cls = "ncirc " + (main ? (n.online ? "online main" : "offline main") : isSim(n) ? "sim" : n.online ? "online" : "offline");
     if (loc.some((x) => x.category === "emergency")) cls += " alert-emergency";
     else if (loc.length) cls += " alert-local";
     if ((n.active_remote || []).length) circles += `<circle class="ring" cx="${a[0]}" cy="${a[1]}" r="${R}"/>`;
-    circles += `<circle class="${cls}" cx="${a[0]}" cy="${a[1]}" r="${R}"/>`;
-    const sub = n.online ? "online" : n.virtual ? "virtuale" : "offline";
-    circles += narrow
-      ? `<text class="nlbl" x="${a[0] + R + 10}" y="${a[1] - 2}">${esc(n.name)}</text>
-         <text class="nsub" x="${a[0] + R + 10}" y="${a[1] + 15}">${esc(sub)}</text>`
-      : `<text class="nlbl" x="${a[0]}" y="${a[1] + R + 20}" text-anchor="middle">${esc(n.name)}</text>
-         <text class="nsub${loc.length ? " on" : ""}" x="${a[0]}" y="${a[1] + 5}" text-anchor="middle">${esc(sub)}</text>`;
+    const numero = (n.id.match(/(\d+)$/) || [])[1] || n.id.slice(0, 2);
+    const nome = n.name.length > 22 ? n.name.slice(0, 21) + "…" : n.name;
+    circles += `<g><title>${esc(n.name)} (${esc(n.id)})</title><circle class="${cls}" cx="${a[0]}" cy="${a[1]}" r="${R}"/>
+      <text class="nnum" x="${a[0]}" y="${a[1] + 5}" text-anchor="middle"${loc.length ? ' style="fill:#fff"' : ""}>${esc(numero)}</text>
+      <text class="nlbl" x="${a[0]}" y="${a[1] + R + 16}" text-anchor="middle">${esc(nome)}${main ? " ★" : ""}</text></g>`;
   }
   const now = serverNow();
   const recent = S.fwds.filter((f) => now - f.ts < 10000 && P[f.from_node] && P[f.to_node]);
@@ -544,28 +576,27 @@ function renderMap() {
     const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
     const ux = dx / l, uy = dy / l;
     const s = [a[0] + ux * (R + 6), a[1] + uy * (R + 6)], e = [b[0] - ux * (R + 10), b[1] - uy * (R + 10)];
-    const c = [(s[0] + e[0]) / 2 + uy * 34, (s[1] + e[1]) / 2 - ux * 34];  // curva: andata e ritorno non si sovrappongono
-    const col = f.action === "cancel" ? "var(--off)" : `var(--${f.category || kindCat(f.kind)})`;
-    arrows += `<path class="fwd" stroke="${col}" marker-end="url(#arr-${f.action === "cancel" ? "off" : (f.category || kindCat(f.kind))})"
+    const c = [(s[0] + e[0]) / 2 + uy * 28, (s[1] + e[1]) / 2 - ux * 28];  // curva: andata e ritorno non si sovrappongono
+    const cat = f.action === "cancel" ? "off" : (f.category || kindCat(f.kind));
+    arrows += `<path class="fwd" stroke="${cat === "off" ? "var(--off)" : `var(--${cat})`}" marker-end="url(#arr-${cat})"
       d="M${s[0]},${s[1]} Q${c[0]},${c[1]} ${e[0]},${e[1]}"/>`;
   }
   const marker = (id, col) => `<marker id="arr-${id}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${col}"/></marker>`;
   const defs = "<defs>" + ["emergency", "violation", "risk", "info"].map((c) => marker(c, `var(--${c})`)).join("") + marker("off", "var(--off)") + "</defs>";
-  setHtml(box, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="mappa degli incroci">${defs}${edges}${labels}${arrows}${circles}</svg>`);
+  setHtml(box, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="mappa degli incroci">${defs}${edges}${arrows}${circles}</svg>`);
+  $("#map-side").textContent = `${nodes.length} incroci da topology.json`;
 }
 
 async function pollNodes() {
   const d = await api("/api/nodes");
   S.nodes = d.nodes || [];
-  S.fwu = d.forward_unknown_direction !== false;
   S.byId = {};
   S.nodes.forEach((n) => { S.byId[n.id] = n; });
-  const on = S.nodes.filter((n) => n.online).length;
-  $("#nodes-side").textContent = `${on} online su ${S.nodes.length}`;
-  setHtml($("#nodes"), S.nodes.length ? S.nodes.map(nodeCard).join("") : '<div class="empty">Nessun incrocio.</div>');
+  const main = findMain();
+  S.mainId = main ? main.id : null;
+  renderNodes();
   if (!S.simReady) setupSim();
   else refreshSimNodes();
-  renderStatsSelect();
   renderStats();
 }
 
@@ -590,91 +621,48 @@ async function pollSummary() {
   const nHaz = Object.values(d.counts || {}).reduce((s, v) => s + v, 0);
   const nSim = Object.values(d.counts_simulated || {}).reduce((s, v) => s + v, 0);
   setHtml($("#totals"), [["pericoli", nHaz + (nSim ? ` <span class="small">+${nSim} sim.</span>` : "")],
-    ["inoltri", d.forwards || 0], ["passaggi", bt.track || 0], ["stati", bt.status || 0]]
+    ["inoltri", d.forwards || 0], ["passaggi", bt.track || 0]]
     .map(([k, v]) => `<div class="metric"><div class="v">${v}</div><div class="k">${k}</div></div>`).join(""));
   const tot = {};
   for (const [k, v] of Object.entries(d.counts || {})) tot[k] = (tot[k] || 0) + v;
   for (const [k, v] of Object.entries(d.counts_simulated || {})) tot[k] = (tot[k] || 0) + v;
-  const rows = Object.entries(tot).sort((a, b) => b[1] - a[1]);
+  const rows = Object.entries(tot).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const max = rows.length ? rows[0][1] : 1;
-  setHtml($("#counts"), rows.length ? rows.map(([k, v]) => {
-    const sim = (d.counts_simulated || {})[k] || 0;
-    return `<div class="barrow cat-${esc(kindCat(k))}"><span title="${esc(k)}">${esc(kindLabel(k))}${sim ? ' <span class="small">(' + sim + " sim.)</span>" : ""}</span>
-      <span class="track"><span class="fill" style="display:block;width:${Math.max(4, v / max * 100)}%"></span></span><span class="n">${v}</span></div>`;
-  }).join("") : '<div class="empty">Ancora nessun pericolo.</div>');
+  setHtml($("#counts"), rows.map(([k, v]) => `<div class="barrow cat-${esc(kindCat(k))}"><span>${esc(kindLabel(k))}</span>
+      <span class="track"><span class="fill" style="display:block;width:${Math.max(4, v / max * 100)}%"></span></span><span class="n">${v}</span></div>`).join(""));
 }
 
 async function pollForwards() {
   const d = await api("/api/forwards?limit=30");
-  S.fwds = d.forwards || [];
-  $("#fwd-n").textContent = S.fwds.length ? "ultimi " + S.fwds.length : "";
-  const rows = S.fwds.slice().reverse();
-  setHtml($("#forwards"), rows.length ? `<table><thead><tr><th>ora</th><th>pericolo</th><th>da → a</th><th>perché</th><th>stato</th></tr></thead><tbody>` +
-    rows.map((f) => {
-      const virt = S.byId[f.to_node] && S.byId[f.to_node].virtual;
-      const st = f.delivered ? '<span class="st-ok">letto dalla board</span>'
-               : virt ? '<span class="st-virt">virtuale</span>' : '<span class="st-wait">in attesa</span>';
-      return `<tr><td>${hhmmss(f.ts)}</td>
-        <td><span class="dot cat-${esc(f.category || kindCat(f.kind))}" style="background:var(--c);width:8px;height:8px"></span>
-          ${f.action === "cancel" ? "fine " : ""}${esc(kindLabel(f.kind))}${f.simulated ? ' <span class="small">sim.</span>' : ""}</td>
-        <td>${esc(nodeName(f.from_node))} → <b>${esc(nodeName(f.to_node))}</b></td>
-        <td class="small">${esc(f.reason || "")}</td><td>${st}</td></tr>`;
-    }).join("") + "</tbody></table>" : '<div class="empty">Nessun inoltro per ora.</div>');
+  S.fwds = d.forwards || [];  // tutti per le frecce sulla mappa, solo gli ultimi 5 nell'elenco
+  const rows = S.fwds.slice(-5).reverse();
+  setHtml($("#forwards"), rows.length ? rows.map((f) => {
+    const st = f.delivered ? '<span class="st-ok">ricevuto</span>'
+             : isSim(S.byId[f.to_node] || {}) ? '<span class="st-virt">simulato</span>' : '<span class="st-wait">in attesa</span>';
+    return `<div class="fw cat-${esc(f.category || kindCat(f.kind))}"><span class="t">${hhmmss(f.ts)}</span>
+      <span>${f.action === "cancel" ? "fine " : ""}<b>${esc(kindLabel(f.kind))}</b><br><span class="small">${esc(nodeName(f.from_node))} → ${esc(nodeName(f.to_node))}</span></span>${st}</div>`;
+  }).join("") : '<div class="empty">Nessun inoltro per ora.</div>');
   renderMap();
 }
 
-/* ------------------------------------------------------------------ statistiche */
-
-function renderStatsSelect() {
-  const withStats = S.nodes.filter((n) => n.stats);
-  const sel = $("#stats-node");
-  const html = withStats.map((n) => `<option value="${esc(n.id)}">${esc(n.name)}</option>`).join("");
-  if (sel.__h !== html) { sel.innerHTML = html; sel.__h = html; if (S.statsNode) sel.value = S.statsNode; }
-  if (!S.statsNode && withStats.length) S.statsNode = withStats[0].id;
-  sel.style.display = withStats.length > 1 ? "" : "none";
-}
+/* ------------------------------------------------------------------ statistiche (solo la board) */
 
 function renderStats() {
-  const n = S.byId[S.statsNode];
+  const n = S.byId[S.mainId];
   const st = n && n.stats;
-  if (!st) { setHtml($("#stats"), '<div class="empty">Nessuna statistica ancora: la board le manda ogni stats_interval_s (60 s di default).</div>'); return; }
-  const ora = (ms) => (ms ? new Date(ms).toLocaleTimeString("it-IT") : "-");  // orologio della board
-  let h = `<div class="small">${esc(n.name)} · periodo di ${dur(st.period_s)} · dalle ${ora(st.from_ts)} alle ${ora(st.to_ts)}</div>`;
-  const ev = Object.entries(st.events || {});
-  const rev = Object.entries(st.remote_events || {});
-  if (ev.length || rev.length) {
-    h += '<div class="chips">' + ev.map(([k, v]) => `<span class="chip cat-${esc(kindCat(k))}">${esc(kindLabel(k))} <b>${v}</b></span>`).join("")
-       + rev.map(([k, v]) => `<span class="chip">dai vicini: ${esc(kindLabel(k))} <b>${v}</b></span>`).join("") + "</div>";
+  if (!st) {
+    setHtml($("#stats"), '<div class="empty">Nessuna statistica ancora: la board le manda ogni minuto.</div>');
+    $("#stats-side").textContent = "";
+    return;
   }
-  for (const [cam, c] of Object.entries(st.cameras || {})) {
-    h += `<div class="cam"><h3>Camera ${esc(cam)}</h3><div class="chips">`;
-    for (const k of ["vehicle", "person", "cyclist", "emergency"]) h += `<span class="chip">${CLASSI_PL[k]} <b>${num((c.counts || {})[k] || 0)}</b></span>`;
-    h += `<span class="chip">oggetti insieme (max) <b>${num(c.active_max)}</b></span><span class="chip">frame <b>${num(c.frames)}</b></span></div>`;
-    const mv = Object.entries(c.movements || {});
-    if (mv.length) {
-      h += '<div class="scroll"><table><thead><tr><th>movimento</th>' + ["vehicle", "person", "cyclist", "emergency"].map((k) => `<th class="num">${CLASSI_PL[k]}</th>`).join("") + "</tr></thead><tbody>"
-         + mv.map(([k, v]) => `<tr><td>${esc(k.replace("->", " → "))}</td>` + ["vehicle", "person", "cyclist", "emergency"].map((x) => `<td class="num">${v[x] || 0}</td>`).join("") + "</tr>").join("")
-         + "</tbody></table></div>";
-    }
-    const sp = Object.entries(c.speeds || {});
-    if (sp.length) {
-      h += '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>velocità</th><th class="num">n</th><th class="num">media</th><th class="num">mediana</th><th class="num">V85</th><th class="num">max</th><th>unità</th></tr></thead><tbody>'
-         + sp.map(([k, v]) => {
-             const d = v.unit === "rel" ? 2 : 0;
-             return `<tr><td>${esc(CLASSI_PL[k] || k)}</td><td class="num">${num(v.n)}</td><td class="num">${num(v.mean, d)}</td><td class="num">${num(v.p50, d)}</td><td class="num"><b>${num(v.p85, d)}</b></td><td class="num">${num(v.max, d)}</td><td>${esc(v.unit === "rel" ? "relativa" : v.unit || "")}</td></tr>`;
-           }).join("") + "</tbody></table></div>";
-    }
-    const cw = Object.entries(c.crosswalk_crossings || {});
-    if (cw.length) h += '<div class="chips">' + cw.map(([dir, v]) => `<span class="chip">strisce ${esc(dir)}: ` + Object.entries(v).map(([k, x]) => `${esc(CLASSI_PL[k] || k)} <b>${x}</b>`).join(", ") + "</span>").join("") + "</div>";
-    const zn = Object.entries(c.zones || {});
-    if (zn.length) {
-      h += '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>zona</th><th class="num">oggetti medi</th><th class="num">max</th><th class="num">occupata</th><th class="num">sosta media</th></tr></thead><tbody>'
-         + zn.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${num(v.avg_objects, 2)}</td><td class="num">${num(v.max_objects)}</td><td class="num">${v.occupancy_ratio != null ? num(v.occupancy_ratio * 100) + "%" : "-"}</td><td class="num">${v.dwell_mean_s != null ? num(v.dwell_mean_s, 1) + " s" : "-"}</td></tr>`).join("")
-         + "</tbody></table></div>";
-    }
-    h += "</div>";
-  }
-  setHtml($("#stats"), h);
+  const tot = { person: 0, cyclist: 0, emergency: 0 };
+  for (const c of Object.values(st.cameras || {})) for (const k in tot) tot[k] += (c.counts || {})[k] || 0;
+  const ora = (ms) => (ms ? new Date(ms).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "-");
+  $("#stats-side").textContent = `${n.name} · ultimi ${dur(st.period_s)} (dalle ${ora(st.from_ts)})`;
+  setHtml($("#stats"), `<div class="metrics">
+    <div class="metric"><div class="v">${tot.person}</div><div class="k">pedoni</div></div>
+    <div class="metric"><div class="v">${tot.cyclist}</div><div class="k">ciclisti</div></div>
+    <div class="metric"><div class="v">${tot.emergency}</div><div class="k">mezzi di soccorso</div></div></div>`);
 }
 
 /* ------------------------------------------------------------------ simulazione */
@@ -686,41 +674,25 @@ function fill(sel, opts, keep) {
 }
 
 function refreshSimNodes() {
-  const ids = S.nodes.map((n) => [n.id, n.name + (n.virtual ? " (virtuale)" : "")]);
+  const ids = S.nodes.filter((n) => n.in_topology !== false).map((n) => [n.id, n.name + " (" + n.id + ")"]);
   const f = $("#sim-from"), t = $("#sim-to");
   const fh = JSON.stringify(ids);
   if (f.__ids !== fh) {
     f.__ids = fh;
     fill(f, ids, true);
-    fill(t, [["", "automatico (secondo la direzione)"]].concat(ids), true);
+    fill(t, [["", "automatico (lungo la direzione)"]].concat(ids), true);
     fillTowards(true);
   }
-  updateRoute();
 }
 
+// direzioni: le vie dell'incrocio in topology.json (con il vicino) e tutti i punti cardinali
 function fillTowards(keep) {
   const n = S.byId[$("#sim-from").value] || {};
-  const opts = Object.entries(n.neighbors || {}).map(([via, d]) => [via, `«${via}» → ${d ? nodeName(d) : "esce dalla rete"}`]);
-  opts.push(["", "sconosciuta"]);
+  const nb = n.neighbors || {};
+  const opts = Object.entries(nb).map(([via, d]) => [via, `${via} → ${d ? nodeName(d) : "esce dalla rete"}`]);
+  for (const d of DIREZIONI) if (!(d in nb)) opts.push([d, d]);
+  opts.push(["", "sconosciuta (avvisa i vicini)"]);
   fill($("#sim-towards"), opts, keep);
-}
-
-function routeOf(from, towards, to) {
-  if (to) return [to];
-  const nb = (S.byId[from] || {}).neighbors || {};
-  if (towards && towards in nb) return nb[towards] ? [nb[towards]] : [];
-  if (!S.fwu) return [];
-  return [...new Set(Object.values(nb).filter((d) => d && d !== from))];
-}
-
-function updateRoute() {
-  const from = $("#sim-from").value, towards = $("#sim-towards").value, to = $("#sim-to").value;
-  const r = routeOf(from, towards, to);
-  let txt = r.length ? "Il server lo consegnerà a: <b>" + r.map((x) => esc(nodeName(x))).join(", ") + "</b>"
-                     : "Nessun destinatario: il veicolo esce dalla rete";
-  if (!to && !towards && r.length) txt += ' <span class="small">(direzione sconosciuta: tutti i vicini)</span>';
-  if (r.some((x) => S.byId[x] && !S.byId[x].virtual)) txt += '<div class="small">la board accende i LED entro ~1 s</div>';
-  $("#sim-route").innerHTML = txt;
 }
 
 function setupSim() {
@@ -734,33 +706,17 @@ function setupSim() {
   }).join("");
   $("#sim-kind").value = "bike_lane_invasion";
   refreshSimNodes();
-  // proposta iniziale: un incrocio virtuale che manda verso una board vera
-  const real = S.nodes.filter((n) => !n.virtual).map((n) => n.id);
-  let best = null;
-  for (const n of S.nodes.filter((x) => x.virtual)) {
-    const via = Object.entries(n.neighbors || {}).find(([, d]) => real.includes(d));
-    if (via) { best = [n.id, via[0]]; break; }
-  }
-  if (best) { $("#sim-from").value = best[0]; fillTowards(false); $("#sim-towards").value = best[1]; }
-  updateRoute();
-  // scorciatoie
-  const presets = [];
-  for (const n of S.nodes.filter((x) => x.virtual)) {
-    for (const [via, d] of Object.entries(n.neighbors || {})) {
-      if (!real.includes(d)) continue;
-      presets.push({ t: `Soccorso da ${nodeName(n.id)} → ${nodeName(d)}`, b: { from_node: n.id, towards: via, kind: "emergency_vehicle", severity: 3 } });
-      presets.push({ t: `Ciclabile invasa da ${nodeName(n.id)} → ${nodeName(d)}`, b: { from_node: n.id, towards: via, kind: "bike_lane_invasion", severity: 2 } });
+  // proposta iniziale: un vicino della board che segnala verso la board
+  const main = S.byId[S.mainId];
+  if (main) {
+    const vicino = S.nodes.find((n) => Object.values(n.neighbors || {}).includes(main.id) && n.id !== main.id);
+    if (vicino) {
+      $("#sim-from").value = vicino.id;
+      fillTowards(false);
+      const via = Object.entries(vicino.neighbors).find(([, d]) => d === main.id);
+      if (via) $("#sim-towards").value = via[0];
     }
   }
-  for (const id of real) {
-    const via = Object.entries((S.byId[id] || {}).neighbors || {}).find(([, d]) => d);
-    if (via) presets.push({ t: `${nodeName(id)} vede contromano verso «${via[0]}»`, b: { from_node: id, towards: via[0], kind: "wrong_way", severity: 3 } });
-  }
-  $("#sim-quick").innerHTML = presets.slice(0, 5).map((p, i) => `<button data-preset="${i}">${esc(p.t)}</button>`).join("");
-  $("#sim-quick").onclick = (e) => {
-    const b = e.target.closest("button[data-preset]");
-    if (b) simulate(presets[+b.dataset.preset].b);
-  };
 }
 
 async function simulate(body) {
@@ -793,7 +749,7 @@ function refreshSoon() {
 /* ------------------------------------------------------------------ avvio */
 
 async function slowOnce() {
-  try { await pollNodes(); await pollSummary(); await pollForwards(); } catch (e) { /* riprovo al giro dopo */ }
+  try { await pollNodes(); await pollSummary(); renderNodes(); await pollForwards(); } catch (e) { /* riprovo al giro dopo */ }
 }
 async function loopEvents() {
   try { await pollEvents(); } catch (e) { /* server giù: riprovo */ }
@@ -812,15 +768,7 @@ async function loadKinds() {
   } catch (e) { setTimeout(loadKinds, 2000); }
 }
 
-$("#sim-from").onchange = () => { fillTowards(false); $("#sim-to").value = ""; updateRoute(); };
-$("#sim-towards").onchange = updateRoute;
-$("#sim-to").onchange = () => {
-  const to = $("#sim-to").value;
-  const nb = (S.byId[$("#sim-from").value] || {}).neighbors || {};
-  const via = Object.entries(nb).find(([, d]) => d === to);
-  if (to && via) $("#sim-towards").value = via[0];
-  updateRoute();
-};
+$("#sim-from").onchange = () => { fillTowards(false); $("#sim-to").value = ""; };
 $("#sim-sev").onclick = (e) => {
   const b = e.target.closest("button");
   if (!b) return;
@@ -830,7 +778,6 @@ $("#sim-sev").onclick = (e) => {
 $("#sim-go").onclick = () => simulate({ from_node: $("#sim-from").value, to_node: $("#sim-to").value,
   towards: $("#sim-towards").value, kind: $("#sim-kind").value, severity: S.sev });
 $("#active").onclick = (e) => { const b = e.target.closest("button[data-cancel]"); if (b) cancelSim(b.dataset.cancel); };
-$("#stats-node").onchange = (e) => { S.statsNode = e.target.value; renderStats(); };
 $("#show-tracks").onchange = () => { $("#feed").innerHTML = ""; S.evInit = false; S.evAfter = 0; };
 $("#token-save").onclick = () => {
   S.token = $("#token-in").value.trim();
@@ -840,6 +787,7 @@ $("#token-save").onclick = () => {
 };
 
 S.token = loadToken();
+showThemeIcon();
 setInterval(updateConn, 500);
 updateConn();
 // prima catalogo e nodi (per i nomi nel flusso eventi), poi i due giri di aggiornamento

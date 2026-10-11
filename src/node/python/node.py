@@ -10,6 +10,7 @@ detections -------->|                                          |
               StatsAggregator (conteggi, velocita', heatmap) <+
 Server --> RemoteLink (pericoli degli incroci vicini) --> LED + Storage + UI
 Incroci vicini / wearable <--> PeerLink (UDP multicast, ESP-NOW): stessi pericoli SENZA server
+Bracciale del ciclista <-- WearableLink (UDP diretto, porta 48100): canale incrocio -> dispositivo
 
 process() va chiamato a ogni frame del modello, tick() circa una volta al secondo
 (anche quando il modello non vede niente: chiude le tracce, manda stato e statistiche).
@@ -30,6 +31,7 @@ from remote import RemoteLink
 from situation import SituationEngine
 from stats import StatsAggregator
 from storage import Storage
+from wearable import WearableLink
 
 REMOTE_SEEN_MAX = 2000  # pericoli remoti gia' gestiti (lo stesso arriva dal server E dal p2p)
 
@@ -64,6 +66,7 @@ class Node:
                                  start_thread=start_threads)
         self.peer = PeerLink(cfg.get("p2p") or {}, self.node_id, on_message=self._on_peer,
                              neighbors=cfg.get("neighbors") or {}, start_thread=start_threads)
+        self.wear = WearableLink(cfg.get("wearable") or {}, self.node_id)
         self._remote_seen = OrderedDict()
         self.latest_scene = []
         self.latest_status = None
@@ -104,6 +107,8 @@ class Node:
             # LED in tempo reale: chi c'e' adesso davanti alla camera, senza aspettare il tick
             self._safe(self.leds.set_presence, {tr.label for tr in recenti}, t, [tr.id for tr in recenti])
             self._safe(self.leds.push, t)
+            self._safe(self.wear.set_tracks, [tr.id for tr in recenti], t)
+            self._safe(self.wear.push, t)
             self._scene(t)
             return out
 
@@ -130,6 +135,7 @@ class Node:
                 "server": self._safe(self.remote.state),
                 "p2p": self._safe(self.peer.state),
                 "leds": self._safe(self.leds.state),
+                "wearable": self._safe(self.wear.state),
                 "spaces": {c: e.space for c, e in self.engines.items()},
             }
             status = self._safe(self.health.maybe_status, t, extra)
@@ -141,6 +147,7 @@ class Node:
                 self._safe(self.storage.cleanup, t)
         # LED di stato acceso se il nodo parla con qualcuno: server oppure incroci vicini in p2p
         self._safe(self.leds.tick, t, self.remote.online or self.peer.online)
+        self._safe(self.wear.tick, t)  # keep-alive verso il bracciale anche senza frame
 
     # ------------------------------------------------------------------ messaggi
 
@@ -151,6 +158,8 @@ class Node:
             # prima il LED (decide il nodo, subito), poi archivio e invio al server
             self._safe(self.leds.on_hazard, msg, True, msg.get("ts", 0) / 1000)
             self._safe(self.leds.push, msg.get("ts", 0) / 1000 or None)
+            self._safe(self.wear.on_hazard, msg, msg.get("ts", 0) / 1000)  # bracciale, diretto
+            self._safe(self.wear.push, msg.get("ts", 0) / 1000)
         self._publish(msg)
         if tipo == "hazard":
             self._safe(self.stats.on_event, msg)
@@ -226,6 +235,6 @@ class Node:
                 "config": public_config(self.cfg)}
 
     def close(self):
-        for comp in (self.api, self.remote, self.peer, self.leds, self.publisher, self.storage):
+        for comp in (self.api, self.remote, self.peer, self.leds, self.wear, self.publisher, self.storage):
             if comp is not None and hasattr(comp, "close"):
                 self._safe(comp.close)

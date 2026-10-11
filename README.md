@@ -117,8 +117,20 @@ it must be forwarded to the intersection the vehicle is heading to:
 
 Every closed track produces a summary (entry/exit street, speed with V85, time per zone, crosswalk crossing with
 direction, trajectory); statistics and a heatmap are aggregated every minute. Hazards travel to the server over HTTP
-(store-and-forward when offline) and directly between intersections and wristbands over the SC-P2P protocol
-(UDP multicast on the LAN or ESP-NOW without any network).
+(store-and-forward when offline). The server forwards them along the vehicle's direction (2 intersections, 3 for
+emergency vehicles and fast vehicles), to the neighbours when the direction is unknown, and along the shortest path
+when a destination is chosen.
+
+**Cyclist wristband (demo).** The nearest intersection talks *directly* to an ESP32 wristband
+(`src/firmware/esp32_bracciale`, UDP port 48100). There is no server and no internet, only a shared local Wi-Fi (even a
+phone hotspot). The wristband LED blinks while a car is entering or stopped in the bike lane and switches off as soon
+as the camera no longer sees it. The same message can travel with no Wi-Fi network at all: an ESP32 "radio" wired to the
+intersection's MCU broadcasts it over ESP-NOW (or the board's Bluetooth LE advertises it), so wristbands near the
+intersection are warned even where there is no network.
+
+**Offline peer-to-peer between intersections (designed, not in the demo).** Intersections can also exchange hazards
+directly without the server over the SC-P2P protocol (`src/node/python/peer.py`: UDP multicast on the LAN, or
+ESP-NOW with no network at all), so a district keeps warning its users even when the backend is unreachable.
 
 --- 
 

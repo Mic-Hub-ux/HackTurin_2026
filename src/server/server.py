@@ -186,7 +186,8 @@ def _status_brief(st):
             "cpu_temp_c": (st.get("system") or {}).get("cpu_temp_c"),
             "active_tracks": st.get("active_tracks"), "warnings": st.get("warnings") or [],
             "server_online": st.get("server_online"), "p2p_online": (st.get("p2p") or {}).get("online"),
-            "leds": st.get("leds"), "uptime_s": st.get("uptime_s"), "outbox": st.get("outbox")}
+            "leds": st.get("leds"), "wearable": st.get("wearable"),
+            "uptime_s": st.get("uptime_s"), "outbox": st.get("outbox")}
 
 
 def actor_class(kind):
@@ -617,6 +618,7 @@ class Hub:
             out.append({
                 "id": nid, "name": tn.get("name") or nid, "virtual": bool(tn.get("virtual")),
                 "in_topology": nid in topo["nodes"], "neighbors": tn.get("neighbors") or {}, "pos": tn.get("pos"),
+                "coordinates": _coords(tn),
                 "first_seen": r.get("first_seen"), "last_seen": last_seen, "ip": r.get("ip"),
                 "online": bool(last_seen) and t - last_seen <= self.offline_ms,
                 "polling": bool(last_poll) and t - last_poll <= self.offline_ms,

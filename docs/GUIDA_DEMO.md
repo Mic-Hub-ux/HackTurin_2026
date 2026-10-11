@@ -1,7 +1,7 @@
 # Guida: dal PC alla demo completa
 
 Ordine consigliato: **Parte 1 → 2 → 3** (il nodo funziona e si vede sul PC). Solo dopo **4** (collega
-da remoto), **5** (braccialetti ESP32) e **6** (UNO R4 come secondo incrocio).
+da remoto) e **5** (bracciale del ciclista con ESP32).
 Ogni passo ha un ✅ **controllo**: se non è verde, guardate la tabella dei problemi in fondo.
 
 ```
@@ -12,14 +12,14 @@ Ogni passo ha un ✅ **controllo**: se non è verde, guardate la tabella dei pro
    | camera + 4 LED  |                      +-------------------------------+
    +-----------------+
         |  UDP peer-to-peer (porta 47999), anche SENZA server
-        +--> ESP32 "ciclista" (LED)    ESP32 mini "pedone" (LED)    UNO R4 WiFi "incrocio-2" (matrice)
+        +--> UDP diretto, porta 48100 --> ESP32 "bracciale del ciclista" (LED): senza server
 ```
 
 ---
 
 ## Parte 1 — Rete e server sul PC
 
-1. **Una sola rete per tutti**, a 2,4 GHz (gli ESP32 e la R4 non vedono i 5 GHz): l'hotspot di un telefono
+1. **Una sola rete per tutti**, a 2,4 GHz (l'ESP32 non vede i 5 GHz): l'hotspot di un telefono
    (su iPhone "Massimizza compatibilità") oppure il Wi‑Fi della sede, se non ha la *client isolation*.
    Collegate il PC a questa rete.
 2. **IP del PC**: in PowerShell lanciate `ipconfig` e prendete l'"Indirizzo IPv4" della scheda Wi‑Fi
@@ -74,7 +74,7 @@ Aprite `C:\Users\Gabriele\Desktop\Hackaton\HackTurin_2026\src\node\python\config
 "server": {"url": "http://IP-PC:8000", "token": "", "poll_s": 1.0},
 "p2p": {"enabled": true, "peers": [], "key": "", "serial": {"port": ""}},
 ```
-(gli indirizzi di ESP32 e R4 in `peers` li aggiungete nelle Parti 5 e 6).
+(l'indirizzo del bracciale ESP32 in `wearable.devices` lo aggiungete nella Parte 5).
 
 Lasciate `"token": ""`. Il token è nel file `.env` nella radice della repo, che non va su GitHub
 (il modello è `.env.example`). Il server lo legge da solo, mentre sulla board lo copiate al passo 2.4.
@@ -226,61 +226,34 @@ Sulla board: `"server": {"url": "https://<utente>.pythonanywhere.com"}`.
 
 ---
 
-## Parte 5 — I due ESP32 come braccialetti (con LED)
+## Parte 5 — Il bracciale del ciclista (ESP32, canale diretto)
 
-1. **Arduino IDE 2**:
-   - Boards Manager → **esp32 by Espressif Systems**;
-   - Library Manager → **ArduinoJson** (di Benoit Blanchon).
-2. **Collegamento per la demo.** Un LED con resistenza 220–330 Ω tra **GPIO 4** (gamba lunga) e **GND**.
-   Più avanti al posto del LED va il motorino con il transistor (vedi `src/firmware/README.md`).
-3. Aprite `src/firmware/esp32_wearable/esp32_wearable.ino` e in alto:
-   - togliete il commento e compilate `#define WIFI_SSID "..."` e `#define WIFI_PASS "..."` con la stessa rete;
-   - **solo per la mini**, se è una **ESP32‑C3 SuperMini**, togliete il commento a `#define SCHEDA_C3_SUPERMINI`.
-     Se la vostra mini è un altro modello, ditemi il nome scritto sulla scheda.
-4. **Scheda in Arduino IDE.**
-   - ESP32 normale: **ESP32 Dev Module**.
-   - C3 SuperMini: **ESP32C3 Dev Module** e in *Strumenti* **USB CDC On Boot: Enabled**.
+L'incrocio più vicino (la UNO Q, `incrocio-1`) manda gli allarmi **direttamente** al bracciale: un
+pacchetto UDP all'indirizzo del bracciale, porta **48100**. Non passa dal server e non serve internet,
+basta la stessa rete Wi‑Fi. È un canale separato da quello tra incroci.
+Il LED del bracciale lampeggia quando un'auto **entra** nella ciclabile, quando un'auto è **ferma** nella ciclabile
+o quando c'è un **sorpasso troppo vicino**, e si spegne appena l'incrocio non vede più il pericolo.
+
+1. **Arduino IDE 2** → Boards Manager → **esp32 by Espressif Systems**. Non servono librerie.
+2. **LED:** gamba lunga → resistenza 220–330 Ω → **GPIO 4**; gamba corta → **GND**.
+3. Aprite `src/firmware/esp32_bracciale/esp32_bracciale.ino` e compilate `WIFI_SSID` e `WIFI_PASS` (la rete della
+   UNO Q, a 2,4 GHz). Se la scheda è una **ESP32‑C3 SuperMini**, togliete le `//` a `#define SCHEDA_C3_SUPERMINI`.
+4. Scegliete la scheda:
+   - ESP32 normale: **ESP32 Dev Module**;
+   - C3 SuperMini: **ESP32C3 Dev Module**, con *USB CDC On Boot: Enabled*.
 
    Poi **Carica**.
-5. Aprite il **Monitor seriale a 115200**. Compare `[wifi] connesso, ip=...`: annotate l'IP di ciascun ESP32.
-6. **Profilo.** Tenete premuto **BOOT** per 1,5 s per passare al profilo successivo. Il LED lampeggia 1 volta per ciclista, 2 per pedone, 3 per veicolo.
-   Mettete **ESP32 normale = ciclista** e **mini = pedone**.
-7. **Prova senza nodo.** Incollate questa riga nel Monitor seriale del ciclista e premete Invio:
+5. Aprite il **Monitor seriale a 115200**: compare `[wifi] collegato, ip=192.168.x.y`. Questo è l'**IP del bracciale**.
+6. Nel `config.json` dell'incrocio:
    ```json
-   {"v":1,"t":"hz","id":"prova-1","n":"test","a":"n","k":"bike_lane_invasion","c":"violation","s":3,"ts":1,"e":30001,"tg":["cyclist"],"h":0}
+   "wearable": {"enabled": true, "devices": ["192.168.x.y"], "broadcast": true, "port": 48100},
    ```
-   ✅ Il LED fa 3 lampi veloci per due volte. La stessa riga sul pedone **non** deve fare niente, perché è un pericolo per ciclisti.
-8. **Collegateli al nodo.** Nel config della board mettete
-   `"p2p": {"enabled": true, "peers": ["IP-ESP32:47999", "IP-MINI:47999"], ...}`, copiate il config e fate Stop → Run.
-   Gli indirizzi servono se il container di App Lab blocca il multicast; se il multicast passa, non fanno danni.
-9. ✅ **Prove.**
-   - **Prova D** (auto in ciclabile): lampeggia solo il ciclista.
-   - **Prova E** (ambulanza): lampeggiano tutti e due.
-   - **Prova F** (pericolo dalla dashboard): anche i braccialetti vicini all'incrocio lo ricevono.
-
----
-
-## Parte 6 — UNO R4 WiFi come "incrocio‑2"
-
-Dimostra il **peer‑to‑peer tra due incroci senza server**.
-
-1. **Arduino IDE.**
-   - Boards Manager → **Arduino UNO R4 Boards**;
-   - libreria **ArduinoJson**.
-2. **Configurate lo sketch.** Aprite `src/firmware/uno_r4_incrocio/uno_r4_incrocio.ino` e impostate `WIFI_SSID`, `WIFI_PASS` e
-   `NODE_IP` (= IP‑BOARD, con le virgole: `IPAddress NODE_IP(192, 168, 43, 50);`).
-3. **Caricate e leggete l'IP.** Caricate e aprite il Monitor seriale a 115200: annotate l'**IP della R4**.
-4. **Aggiornate la board.** Nel config della board aggiungete `"IP-R4:47999"` a `p2p.peers`. `p2p.key` deve restare **vuota**: la R4 non firma i messaggi.
-   Copiate il config e fate Stop → Run.
-5. ✅ **Prove.**
-   - Nel Monitor seriale della R4 scrivete **`b`** e premete Invio (oppure toccate con un filo **D2 e GND**):
-     - sulla matrice della R4 compare la freccia;
-     - sulla UNO Q **lampeggia il LED 2**;
-     - in console compare `[PERICOLO VICINO] bike_lane_invasion ... da=incrocio-2`.
-   - **`c`** = fine del pericolo, e il LED 2 si spegne. **`e`** = ambulanza, e il LED 3 lampeggia veloce.
-   - Al contrario: quando la UNO Q vede un pericolo che va verso la via collegata a `incrocio-2`, sulla matrice della R4
-     compare il **triangolo** lampeggiante veloce (lento se il pericolo è per un altro incrocio). L'ambulanza compare come **croce**.
-   - **Spegnete il server**: il LED 4 della UNO Q resta acceso, perché c'è comunque un vicino (la R4) che risponde.
+   Copiate il config sulla board e fate **Stop → Run**.
+7. ✅ **Controlli:**
+   - **LED della scheda del bracciale acceso fisso** = l'incrocio è collegato. Nel Monitor seriale compare `[collegato] ricevo dall'incrocio incrocio-1`.
+   - **Auto nella zona ciclabile** (video sul telefono davanti alla camera): il LED su GPIO 4 lampeggia e nel monitor compare `[ALLARME] Auto nella ciclabile`. Quando l'auto esce: `[fine allarme]`.
+   - **Dashboard → Nodes:** accanto a incrocio‑1 c'è `wristband ✓`, che diventa `wristband ALERT` durante l'allarme.
+   - **Prova senza incrocio:** scrivete `t` nel Monitor seriale per un allarme di prova di 3 s.
 
 ---
 
@@ -294,6 +267,5 @@ Dimostra il **peer‑to‑peer tra due incroci senza server**.
 | La compilazione fallisce su `Arduino_RouterBridge.h` | aggiungete la libreria Arduino_RouterBridge allo sketch (Parte 2.6) |
 | Il LED 4 lampeggia ogni 2 s e gli altri sono spenti | il Python non comanda l'MCU: app ferma o in errore, guardate la console |
 | I LED non si accendono mai | gamba lunga e gamba corta invertite, oppure LED ancora collegato al 5 V |
-| ESP32 e R4 non ricevono niente | stessa rete 2,4 GHz? IP giusti in `p2p.peers`? `p2p.enabled: true`? `p2p.key` vuota? |
-| La R4 manda ma la UNO Q non accende il LED 2 | `NODE_IP` sbagliato nello sketch della R4, oppure `node_id` della board diverso da `incrocio-1` |
+| Il bracciale non riceve niente (LED della scheda che lampeggia ogni secondo) | stessa rete a 2,4 GHz? IP giusto in `wearable.devices`? `wearable.enabled: true`? config copiato e Stop → Run? |
 | Troppi pericoli falsi | zone non allineate all'inquadratura: ridisegnatele; poi alzate le soglie in `thresholds` |
