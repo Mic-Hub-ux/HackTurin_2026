@@ -34,10 +34,10 @@
   "traffic_light": {"mode": "none"},
   "thresholds": {"speed_limit_kmh": 50},
 
-  "server": {"url": "", "token": "", "poll_s": 1.0},
+  "server": {"url": "https://michubux.pythonanywhere.com", "token": "", "poll_s": 1.0},
   "publish": {"send": {"scene": true}},
   "leds": {"enabled": true, "roles": ["local", "remote", "emergency", "status"]},
-  "p2p": {"enabled": false, "peers": [], "key": "", "serial": {"port": ""}},
+  "p2p": {"enabled": true, "peers": [], "key": "", "serial": {"port": ""}},
   "api": {"enabled": false, "port": 8100},
   "data": {"stats_interval_s": 60, "retention_days": 7}
 }

@@ -16,10 +16,14 @@
   All'avvio: test dei LED uno dopo l'altro (200 ms ciascuno), poi LED 4 fisso finche' il
   Bridge non e' pronto (se resta fisso, il router Linux non risponde).
 
-  COLLEGAMENTO (ogni LED ha gia' la sua resistenza in serie)
-    pin D2 / D3 / D4 / D5 -> resistenza -> anodo del LED (gamba lunga)
-    catodo del LED (gamba corta, lato piatto) -> GND   (un GND comune va bene per tutti)
-  In pratica: il filo che oggi va al 5V va sul pin, quello al GND resta al GND.
+  COLLEGAMENTO "ANODO COMUNE" (COMMON_ANODE true, quello della nostra breadboard)
+    gamba lunga (anodo) di tutti i LED -> binario comune -> pin 3.3V della board (consigliato; vedi sotto)
+    gamba corta (catodo) -> resistenza -> pin D2 / D3 / D4 / D5   (al posto del filo che oggi va a GND)
+    Il LED si accende quando il pin va a GND (LOW). Da spento il pin resta "scollegato" (INPUT).
+    Meglio 3.3V che 5V sul binario comune: i pin dell'MCU lavorano a 3,3 V. Con il 5V i LED rossi/gialli
+    possono restare leggermente accesi da spenti e il pin riceve una tensione piu' alta della sua.
+  COLLEGAMENTO "CATODO COMUNE" (COMMON_ANODE false)
+    pin D2..D5 -> resistenza -> gamba lunga; gamba corta -> GND.
   La resistenza puo' stare indifferentemente sulla gamba lunga o su quella corta.
   ATTENZIONE: i pin dell'MCU sono a 3,3 V e reggono poca corrente: stare sotto ~8 mA per pin.
     LED rosso/giallo (~2 V) con 220-330 ohm -> circa 4-6 mA: ok.
@@ -29,6 +33,8 @@
 #include <Arduino_RouterBridge.h>
 
 const int LED_PINS[4] = {2, 3, 4, 5};
+// true: anodi sul binario comune (3.3V), catodi -> resistenza -> pin. false: pin -> LED -> GND
+const bool COMMON_ANODE = true;
 const uint32_t DEFAULT_TTL_MS = 3000;
 const uint32_t OFFLINE_PERIOD_MS = 2000;  // fail-safe: un lampo del LED 4 ogni 2 s...
 const uint32_t OFFLINE_FLASH_MS = 150;    // ...lungo 150 ms
@@ -60,26 +66,40 @@ bool mode_level(uint32_t mode, uint32_t now) {
   }
 }
 
+// Accende/spegne il LED sul pin, qualunque sia il collegamento
+void drive(int pin, bool on) {
+  if (COMMON_ANODE) {
+    if (on) {
+      pinMode(pin, OUTPUT);
+      digitalWrite(pin, LOW);   // il pin porta il catodo a GND: passa corrente
+    } else {
+      pinMode(pin, INPUT);      // pin "scollegato": nessuna corrente, anche con il binario a 5V
+    }
+  } else {
+    digitalWrite(pin, on ? HIGH : LOW);
+  }
+}
+
 void write_led(int i, bool on) {
   if (level[i] != on) {
     level[i] = on;
-    digitalWrite(LED_PINS[i], on ? HIGH : LOW);
+    drive(LED_PINS[i], on);
   }
 }
 
 void setup() {
   for (int i = 0; i < 4; i++) {
-    pinMode(LED_PINS[i], OUTPUT);
-    digitalWrite(LED_PINS[i], LOW);
+    if (!COMMON_ANODE) pinMode(LED_PINS[i], OUTPUT);
+    drive(LED_PINS[i], false);
   }
   // Test del cablaggio: ogni LED 200 ms, uno dopo l'altro
   for (int i = 0; i < 4; i++) {
-    digitalWrite(LED_PINS[i], HIGH);
+    drive(LED_PINS[i], true);
     delay(200);
-    digitalWrite(LED_PINS[i], LOW);
+    drive(LED_PINS[i], false);
   }
   // LED 4 fisso mentre aspetto il router Linux (Bridge.begin aspetta la sua risposta)
-  digitalWrite(LED_PINS[3], HIGH);
+  drive(LED_PINS[3], true);
   level[3] = true;
   Bridge.begin();
   Bridge.provide("set_leds", set_leds);

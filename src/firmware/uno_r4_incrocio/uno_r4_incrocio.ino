@@ -25,7 +25,7 @@
 // ======================= configurazione =======================
 #define WIFI_SSID "nome-rete"           // la stessa rete della UNO Q (2,4 GHz)
 #define WIFI_PASS "password"
-IPAddress NODE_IP(192, 168, 1, 50);     // IP della UNO Q (sulla board: hostname -I)
+IPAddress NODE_IP(192, 168, 23, 174);   // IP della UNO Q (sulla board: hostname -I)
 #define MY_ID "incrocio-2"
 #define TARGET_ID "incrocio-1"          // a chi mandiamo i pericoli (la UNO Q)
 #define P2P_PORT 47999

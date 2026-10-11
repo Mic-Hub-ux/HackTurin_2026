@@ -98,8 +98,12 @@ cp -n ~/ArduinoApps/efesto/sketch/sketch.ino ~/sketch_originale.ino
 cp -r ~/sc_python/* ~/ArduinoApps/efesto/python/
 ```
 ```bash
+mkdir -p ~/ArduinoApps/efesto/sketch
+```
+```bash
 cp ~/sc_sketch.ino ~/ArduinoApps/efesto/sketch/sketch.ino
 ```
+(`mkdir` serve se l'app era solo Python e non ha ancora la cartella `sketch/`.)
 I backup vanno nella home e **non** nella cartella `sketch/`: due file `.ino` nella stessa cartella non compilano.
 
 Il token: copiate il `.env` accanto a `config.json`. Il comando parte dal PC, in PowerShell, e il `cp -r ... *`
@@ -115,8 +119,11 @@ scp C:\Users\Gabriele\Desktop\Hackaton\HackTurin_2026\.env efesto:~/ArduinoApps/
 > e poi **Stop → Run** in App Lab.
 
 ### 2.5 I 4 LED
-Spostate i LED dal 5 V ai pin digitali (a board **spenta**). Ogni LED: **gamba lunga → resistenza → pin**,
-**gamba corta → GND**.
+Collegamento ad **anodo comune**, a board **spenta**. È quello della nostra breadboard, con `COMMON_ANODE true` nello sketch:
+- **gamba lunga** di tutti i LED sul binario comune, collegato al pin **3.3V** della board. Meglio del 5V, perché i pin lavorano a 3,3 V;
+- **gamba corta → resistenza → pin** della tabella, al posto del filo che prima andava a GND.
+
+Il LED si accende quando il pin va a GND.
 
 | Pin | LED | Significato |
 |---|---|---|
