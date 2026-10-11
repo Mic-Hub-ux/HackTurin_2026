@@ -2,6 +2,8 @@
 
 **Tutta la documentazione del progetto si trova nel file [Efesto.pdf](Efesto.pdf).**
 
+**Video di presentazione del progetto: [guardalo su YouTube](https://www.youtube.com/watch?v=bz3QYN31SZ0).**
+
 Nel documento trovate:
 
 - **Il problema**: perché gli attraversamenti di oggi sono "ciechi", con i dati sulle missioni del 118 a Torino.
