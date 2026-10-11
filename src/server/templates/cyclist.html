@@ -18,7 +18,7 @@
 <body class="h-full bg-slate-50 dark:bg-black text-slate-900 dark:text-white font-sans flex flex-col items-center justify-start p-4 transition-colors duration-300">
 
     <div class="w-full max-w-md flex flex-col gap-5 my-auto">
-        
+
         <!-- Header -->
         <header class="flex items-center justify-between pt-2">
             <div>
@@ -41,13 +41,19 @@
                     <i data-lucide="chevron-down" class="w-4 h-4"></i>
                 </span>
             </div>
+            <p id="nodeInfo" class="text-[11px] text-slate-400 dark:text-zinc-500"></p>
         </div>
 
         <!-- Dynamic Safety Alert Banner -->
-        <div id="alertBanner" class="p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-emerald-500 text-white flex items-center justify-center gap-2">
-            <i data-lucide="shield-check" class="w-5 h-5"></i>
-            <span id="alertText">Approaching Safe</span>
+        <div id="alertBanner" class="p-4 rounded-2xl text-center font-bold text-sm tracking-wide shadow-lg transition-all duration-300 bg-emerald-500 text-white flex flex-col items-center justify-center gap-1">
+            <span class="flex items-center gap-2"><i data-lucide="shield-check" class="w-5 h-5" id="alertIcon"></i><span id="alertText">Approaching Safe</span></span>
+            <span id="alertDetail" class="text-xs font-medium opacity-90"></span>
         </div>
+
+        <!-- Alerts on this phone -->
+        <button id="alertsBtn" class="p-3 rounded-2xl bg-white dark:bg-zinc-900/80 border border-slate-200/80 dark:border-zinc-800 shadow-sm text-sm font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <i data-lucide="vibrate" class="w-4 h-4"></i><span id="alertsBtnText">Enable vibration alerts</span>
+        </button>
 
         <!-- Live Metrics Grid -->
         <div class="grid grid-cols-1 gap-3">
@@ -73,6 +79,17 @@
                 <span class="text-2xl font-black tracking-tight text-emerald-600 dark:text-emerald-400" id="valCyclists">-</span>
             </div>
 
+            <!-- Vehicles -->
+            <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300">
+                        <i data-lucide="car" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-sm font-medium text-slate-600 dark:text-zinc-400">Vehicles</span>
+                </div>
+                <span class="text-2xl font-black tracking-tight text-slate-700 dark:text-zinc-200" id="valVehicles">-</span>
+            </div>
+
             <!-- Ambulances -->
             <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -84,6 +101,12 @@
                 <span class="text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400" id="valAmbulances">-</span>
             </div>
         </div>
+
+        <!-- Hazards around this intersection -->
+        <div class="bg-white dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-sm space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500">Hazards for cyclists</p>
+            <div id="hazardList" class="space-y-1.5 text-sm"></div>
+        </div>
     </div>
 
     <script>
@@ -92,11 +115,26 @@
         const nodeSelect = document.getElementById('nodeSelect');
         const alertBanner = document.getElementById('alertBanner');
         const alertText = document.getElementById('alertText');
+        const alertDetail = document.getElementById('alertDetail');
         const valPedestrians = document.getElementById('valPedestrians');
         const valCyclists = document.getElementById('valCyclists');
+        const valVehicles = document.getElementById('valVehicles');
         const valAmbulances = document.getElementById('valAmbulances');
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeIcon = document.getElementById('themeIcon');
+
+        const KIND_EN = {
+            emergency_vehicle: 'Emergency vehicle approaching', bike_lane_invasion: 'Car invading the bike lane',
+            bike_lane_hotspot: 'Bike lane often invaded here', close_pass: 'Vehicles passing too close to cyclists',
+            near_miss: 'Near miss with a vulnerable user', speeding: 'Speeding vehicle', sudden_acceleration: 'Aggressive acceleration',
+            solid_line_crossing: 'Vehicle crossing the solid line', wrong_way: 'Wrong-way vehicle', u_turn: 'Vehicle making a U-turn',
+            forbidden_movement: 'Forbidden turn', red_light_violation: 'Vehicle ran a red light', congestion: 'Congestion ahead',
+            collision_risk: 'Collision risk', illegal_stop: 'Vehicle stopped on the lane', cyclist_on_sidewalk: 'Bike on sidewalk'
+        };
+        const label = k => KIND_EN[k] || (k || '').replace(/_/g, ' ');
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        let kindTargets = {};   // kind -> [person, cyclist, vehicle]
+        let alertsOn = false, wakeLock = null, lastAlertKey = '';
 
         themeToggleBtn.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
@@ -105,31 +143,53 @@
             lucide.createIcons();
         });
 
-        // Dynamically populate dropdown only if node count changes, preserving user selection
-// Aggiorna e ordina correttamente i nodi nel menu a tendina
+        document.getElementById('alertsBtn').addEventListener('click', async () => {
+            alertsOn = !alertsOn;
+            document.getElementById('alertsBtnText').textContent = alertsOn ? 'Vibration alerts ON' : 'Enable vibration alerts';
+            if (alertsOn) {
+                if (navigator.vibrate) navigator.vibrate(100);  // also unlocks vibration on Android
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+            } else if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+        });
+
+        // Sorted list: real intersections first, then the simulated grid (node_01, node_02 ... node_10)
         function updateNodesList(nodesData) {
             const currentSelected = nodeSelect.value;
-            
-            // Ordina i nodi alfabeticamente/numericamente in base al node_id (es. node_01, node_02... node_10)
-            nodesData.sort((a, b) => a.node_id.localeCompare(b.node_id, undefined, { numeric: true }));
-
-            if (nodeSelect.options.length !== nodesData.length) {
+            nodesData.sort((a, b) => (a.source === 'client') - (b.source === 'client') ||
+                a.node_id.localeCompare(b.node_id, undefined, { numeric: true }));
+            const ids = nodesData.map(n => n.node_id).join('|');
+            if (nodeSelect.dataset.ids !== ids) {
+                nodeSelect.dataset.ids = ids;
                 nodeSelect.innerHTML = '';
                 nodesData.forEach(node => {
                     const opt = document.createElement('option');
                     opt.value = node.node_id;
-                    // Formatta il nome in modo pulito ed elegante
-                    const nodeNum = node.node_id.replace('node_', '');
-                    opt.textContent = `Node ${nodeNum}`;
+                    opt.textContent = node.source === 'client' ? `Node ${node.node_id.replace('node_', '')} (simulated)` : (node.name || node.node_id);
                     nodeSelect.appendChild(opt);
                 });
-
                 if (currentSelected && nodesData.some(n => n.node_id === currentSelected)) {
                     nodeSelect.value = currentSelected;
                 } else if (nodesData.length > 0) {
-                    nodeSelect.value = nodesData[0].node_id;
+                    nodeSelect.value = new URLSearchParams(location.search).get('node') || nodesData[0].node_id;
                 }
             }
+        }
+
+        // Hazards relevant to a cyclist: emergencies, kinds targeting cyclists, everything forwarded by neighbors
+        function cyclistHazards(node) {
+            const relevant = a => a.category === 'emergency' || (kindTargets[a.kind] || ['cyclist']).includes('cyclist');
+            const here = (node.active_hazards || []).filter(relevant).map(a => ({ ...a, where: 'at this intersection' }));
+            const incoming = (node.active_remote || []).filter(relevant).map(a => ({ ...a, where: `from ${a.from_node}${a.arrives_from ? ' (arriving from ' + a.arrives_from + ')' : ''}` }));
+            const rank = a => (a.category === 'emergency' ? 10 : 0) + (Number(a.severity) || 1);
+            return [...here, ...incoming].sort((a, b) => rank(b) - rank(a));
+        }
+
+        function setBanner(color, icon, text, detail) {
+            alertBanner.style.setProperty('background-color', color, 'important');
+            alertText.textContent = text;
+            alertDetail.textContent = detail || '';
+            document.getElementById('alertIcon').setAttribute('data-lucide', icon);
+            lucide.createIcons();
         }
 
         function fetchNodeData() {
@@ -143,29 +203,50 @@
 
                     const selectedNodeId = nodeSelect.value || data[0].node_id;
                     const currentNode = data.find(n => n.node_id === selectedNodeId) || data[0];
+                    if (!currentNode) return;
 
-                    if (currentNode && currentNode.counts) {
-                        const counts = currentNode.counts;
-                        valPedestrians.textContent = counts.pedestrians;
-                        valCyclists.textContent = counts.cyclists;
-                        valAmbulances.textContent = counts.ambulances;
+                    const counts = currentNode.counts || {};
+                    valPedestrians.textContent = counts.pedestrians ?? '-';
+                    valCyclists.textContent = counts.cyclists ?? '-';
+                    valVehicles.textContent = counts.vehicles ?? '-';
+                    valAmbulances.textContent = counts.ambulances ?? '-';
+                    const win = { live: 'live', last_period: 'last minute', none: 'no data yet' }[currentNode.counts_window] || 'live';
+                    document.getElementById('nodeInfo').textContent =
+                        `${currentNode.online ? 'online' : 'offline'} · counts ${win}${currentNode.source === 'client' ? ' · simulated node' : ''}`;
 
-                        // Force background colors reliably
-                        if (counts.ambulances > 0) {
-                            alertBanner.style.setProperty('background-color', '#e11d48', 'important');
-                            alertText.textContent = "WARNING: Ambulance Approaching!";
-                        } else if (counts.pedestrians > 15) {
-                            alertBanner.style.setProperty('background-color', '#f59e0b', 'important');
-                            alertText.textContent = "Caution: High Pedestrian Density";
-                        } else {
-                            alertBanner.style.setProperty('background-color', '#10b981', 'important');
-                            alertText.textContent = "Intersection Clear & Safe";
-                        }
+                    const hazards = cyclistHazards(currentNode);
+                    document.getElementById('hazardList').innerHTML = hazards.map(a => `
+                        <div class="flex items-start gap-2"><span class="mt-1.5 w-2 h-2 rounded-full ${a.category === 'emergency' ? 'bg-orange-500' : a.severity >= 3 ? 'bg-rose-500' : 'bg-amber-500'}"></span>
+                        <span><b>${esc(label(a.kind))}</b><br><span class="text-xs text-slate-400">${esc(a.where)}</span></span></div>`).join('')
+                        || '<p class="text-xs text-slate-400">No hazards reported around this intersection.</p>';
+
+                    // Force background colors reliably (real hazards first, then the counts as before)
+                    const top = hazards[0];
+                    if (top && top.category === 'emergency') {
+                        setBanner('#e11d48', 'siren', 'WARNING: Emergency Vehicle Approaching!', top.where);
+                    } else if (top) {
+                        setBanner(top.severity >= 3 ? '#e11d48' : '#f59e0b', 'triangle-alert', label(top.kind), top.where);
+                    } else if (counts.ambulances > 0) {
+                        setBanner('#e11d48', 'ambulance', 'WARNING: Ambulance Approaching!');
+                    } else if (counts.pedestrians > 15) {
+                        setBanner('#f59e0b', 'users', 'Caution: High Pedestrian Density');
+                    } else {
+                        setBanner('#10b981', 'shield-check', 'Intersection Clear & Safe');
                     }
+
+                    // Vibrate once per new hazard
+                    const key = top ? top.id + top.kind : '';
+                    if (alertsOn && key && key !== lastAlertKey && navigator.vibrate) {
+                        navigator.vibrate(top.category === 'emergency' ? [600, 200, 600, 200, 600] : [200, 100, 200, 100, 200]);
+                    }
+                    lastAlertKey = key;
                 })
                 .catch(err => console.error('Error fetching cyclist data:', err));
         }
 
+        fetch('/api/kinds').then(r => r.json()).then(d => {
+            (d.kinds || []).forEach(k => kindTargets[k.kind] = k.targets || []);
+        }).catch(() => {});
         setInterval(fetchNodeData, 1500);
         nodeSelect.addEventListener('change', fetchNodeData);
         fetchNodeData();

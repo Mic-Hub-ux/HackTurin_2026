@@ -40,12 +40,20 @@
             color: #9ca3af !important;
             padding: 10px 12px 0 0 !important;
         }
+        .tab-btn[aria-selected="true"] { background: #2563eb; color: #fff; }
+        .forward-line { animation: dash 1s linear infinite; }
+        @keyframes dash { to { stroke-dashoffset: -24; } }
+        .led { width: 10px; height: 10px; border-radius: 9999px; display: inline-block; background: #475569; }
+        .led.on { background: #f43f5e; box-shadow: 0 0 6px #f43f5e; }
+        .led.slow { animation: blink 1s steps(1) infinite; background: #f43f5e; }
+        .led.fast { animation: blink .25s steps(1) infinite; background: #f43f5e; }
+        @keyframes blink { 50% { opacity: .15; } }
     </style>
 </head>
 <body class="h-full flex overflow-hidden bg-slate-100 dark:bg-slate-950 font-sans transition-colors duration-300">
 
     <!-- Sidebar Control Center -->
-    <aside class="w-96 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-xl transition-colors duration-300">
+    <aside class="w-[26rem] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-10 shadow-xl transition-colors duration-300">
         <!-- Header -->
         <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -63,73 +71,145 @@
             </button>
         </div>
 
+        <!-- Token (only if the server asks for it) -->
+        <div id="tokenBar" class="hidden px-6 py-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-300 space-y-2">
+            <p class="font-semibold">This server requires an access token.</p>
+            <div class="flex gap-2">
+                <input id="tokenInput" type="password" placeholder="token" class="flex-1 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800 text-slate-900 dark:text-white">
+                <button id="tokenSave" class="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-semibold">Use</button>
+            </div>
+        </div>
+
         <!-- Scrollable Controls -->
         <div class="flex-1 overflow-y-auto p-6 space-y-6">
             <!-- Live Status Banner -->
-            <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-3">
+            <div id="statusBanner" class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 flex items-center gap-3">
                 <span class="relative flex h-3 w-3">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  <span id="statusPing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span id="statusDot" class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                 </span>
                 <div class="text-xs">
-                    <p class="font-semibold text-emerald-900 dark:text-emerald-300">System Live & Synchronized</p>
-                    <p class="text-emerald-700 dark:text-emerald-400">Monitoring IoT peer nodes across Turin.</p>
+                    <p id="statusTitle" class="font-semibold text-emerald-900 dark:text-emerald-300">System Live & Synchronized</p>
+                    <p id="statusText" class="text-emerald-700 dark:text-emerald-400">Monitoring IoT peer nodes across Turin.</p>
                 </div>
             </div>
 
-            <!-- Search Field -->
-            <div class="space-y-2">
-                <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Search Peer Node</label>
-                <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <i data-lucide="search" class="w-4 h-4"></i>
-                    </span>
-                    <input type="text" id="nodeSearch" placeholder="e.g. node_01" 
-                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            <!-- Network KPIs -->
+            <div class="grid grid-cols-4 gap-2 text-center">
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                    <i data-lucide="user" class="w-4 h-4 mx-auto text-blue-500"></i>
+                    <p id="kpiPed" class="text-lg font-bold text-slate-900 dark:text-white">-</p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">pedestrians</p>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                    <i data-lucide="bike" class="w-4 h-4 mx-auto text-emerald-500"></i>
+                    <p id="kpiCyc" class="text-lg font-bold text-slate-900 dark:text-white">-</p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">cyclists</p>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                    <i data-lucide="car" class="w-4 h-4 mx-auto text-slate-500"></i>
+                    <p id="kpiVeh" class="text-lg font-bold text-slate-900 dark:text-white">-</p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">vehicles</p>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                    <i data-lucide="triangle-alert" class="w-4 h-4 mx-auto text-rose-500"></i>
+                    <p id="kpiHaz" class="text-lg font-bold text-slate-900 dark:text-white">-</p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">hazards today</p>
                 </div>
             </div>
 
-            <!-- Category Toggles -->
-            <div class="space-y-3">
-                <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Traffic Layers</label>
-                
+            <!-- Tabs -->
+            <div class="grid grid-cols-4 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <button class="tab-btn py-2 rounded-lg" data-tab="live" aria-selected="true">Live</button>
+                <button class="tab-btn py-2 rounded-lg" data-tab="hazards" aria-selected="false">Hazards <span id="hazBadge"></span></button>
+                <button class="tab-btn py-2 rounded-lg" data-tab="nodes" aria-selected="false">Nodes</button>
+                <button class="tab-btn py-2 rounded-lg" data-tab="simulate" aria-selected="false">Simulate</button>
+            </div>
+
+            <!-- TAB: Live -->
+            <section data-panel="live" class="space-y-6">
+                <!-- Search Field -->
                 <div class="space-y-2">
-                    <!-- Pedestrians -->
-                    <div class="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 rounded-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"><i data-lucide="user" class="w-4 h-4"></i></div>
-                            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Pedestrians</span>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="filterPedestrians" class="sr-only peer" checked>
-                            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-
-                    <!-- Cyclists -->
-                    <div class="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 rounded-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"><i data-lucide="bike" class="w-4 h-4"></i></div>
-                            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Cyclists</span>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="filterCyclists" class="sr-only peer" checked>
-                            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                        </label>
-                    </div>
-
-                    <!-- Ambulances -->
-                    <div class="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 rounded-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400"><i data-lucide="ambulance" class="w-4 h-4"></i></div>
-                            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Ambulances</span>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="filterAmbulances" class="sr-only peer" checked>
-                            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
-                        </label>
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Search Peer Node</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                        </span>
+                        <input type="text" id="nodeSearch" placeholder="e.g. incrocio-1 or node_01"
+                            class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
                     </div>
                 </div>
+
+                <!-- Category Toggles -->
+                <div class="space-y-3">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Traffic Layers</label>
+                    <div class="space-y-2" id="layerToggles"></div>
+                </div>
+
+                <!-- Selected node statistics -->
+                <div class="space-y-3">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Intersection Analytics</label>
+                    <select id="statsNode" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white"></select>
+                    <div id="statsBox" class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                        <p class="text-slate-400">Waiting for the first statistics period...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Hazards -->
+            <section data-panel="hazards" class="space-y-6 hidden">
+                <div class="space-y-3">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Hazards</label>
+                    <div id="activeList" class="space-y-2"></div>
+                </div>
+                <div class="space-y-3">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Peer Forwarding (server &rarr; neighbor)</label>
+                    <div id="forwardList" class="space-y-1.5 text-xs"></div>
+                </div>
+                <div class="space-y-3">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Live Event Feed</label>
+                    <div id="feed" class="space-y-1.5 text-xs"></div>
+                </div>
+            </section>
+
+            <!-- TAB: Nodes -->
+            <section data-panel="nodes" class="space-y-3 hidden">
+                <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Smart Crossing Nodes</label>
+                <div id="nodeCards" class="space-y-2"></div>
+                <p class="text-[11px] text-slate-400">LEDs on the board: 1 local hazard &middot; 2 hazard from a neighbor &middot; 3 emergency &middot; 4 link to server/peers.</p>
+            </section>
+
+            <!-- TAB: Simulate -->
+            <section data-panel="simulate" class="space-y-4 hidden">
+                <p class="text-xs text-slate-500 dark:text-slate-400">Pretend that an intersection detected a hazard: the server forwards it like a real one and the board lights LED 2.</p>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <label class="space-y-1"><span class="text-slate-500 dark:text-slate-400">Seen by</span>
+                        <select id="simFrom" class="w-full py-2 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"></select></label>
+                    <label class="space-y-1"><span class="text-slate-500 dark:text-slate-400">Deliver to</span>
+                        <select id="simTo" class="w-full py-2 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"></select></label>
+                    <label class="space-y-1 col-span-2"><span class="text-slate-500 dark:text-slate-400">Hazard</span>
+                        <select id="simKind" class="w-full py-2 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"></select></label>
+                    <label class="space-y-1"><span class="text-slate-500 dark:text-slate-400">Severity</span>
+                        <select id="simSev" class="w-full py-2 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white">
+                            <option value="3">3 - danger</option><option value="2" selected>2 - warning</option><option value="1">1 - info</option></select></label>
+                    <label class="space-y-1"><span class="text-slate-500 dark:text-slate-400">Heading (optional)</span>
+                        <input id="simTowards" placeholder="e.g. via" class="w-full py-2 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"></label>
+                </div>
+                <button id="simGo" class="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-lg shadow-rose-500/30 flex items-center justify-center gap-2">
+                    <i data-lucide="siren" class="w-4 h-4"></i> Send simulated hazard
+                </button>
+                <p id="simResult" class="text-xs text-slate-500 dark:text-slate-400"></p>
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Simulated & still active</label>
+                    <div id="simActive" class="space-y-1.5 text-xs"></div>
+                </div>
+            </section>
+
+            <!-- Quick links -->
+            <div class="grid grid-cols-3 gap-2 text-xs font-semibold">
+                <a href="/cyclist" class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-center">Cyclist view</a>
+                <a href="/app?node=incrocio-1" class="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-center">Phone alerts</a>
+                <a href="/console" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-center">Offline console</a>
             </div>
         </div>
     </aside>
@@ -137,6 +217,7 @@
     <!-- Map Viewport -->
     <main class="flex-1 h-full relative z-0">
         <div id="map"></div>
+        <div id="toasts" class="absolute top-4 right-4 z-[1000] space-y-2 w-80"></div>
     </main>
 
     <!-- Scripts -->
@@ -144,144 +225,457 @@
     <script>
         lucide.createIcons();
 
-        // 1. Configurazione Mappa OpenStreetMap Stabile
+        // ------------------------------------------------------------ labels & colors
+        const KIND_EN = {
+            emergency_vehicle: 'Emergency vehicle', speeding: 'Speeding', sudden_acceleration: 'Sudden acceleration',
+            harsh_braking: 'Harsh braking', solid_line_crossing: 'Solid line crossed', wrong_way: 'Wrong-way driving',
+            u_turn: 'U-turn', forbidden_movement: 'Forbidden turn', bike_lane_invasion: 'Car in bike lane',
+            bike_lane_hotspot: 'Bike lane often invaded', illegal_stop: 'Illegal stop', congestion: 'Congestion',
+            pedestrian_not_yielded: 'Pedestrian not yielded', near_miss: 'Near miss', collision_risk: 'Collision risk',
+            close_pass: 'Close pass on cyclist', pedestrian_outside_crosswalk: 'Pedestrian outside crosswalk',
+            slow_pedestrian: 'Slow pedestrian on crosswalk', pedestrian_waiting: 'Pedestrian waiting',
+            crowd_on_crosswalk: 'Crowd on crosswalk', cyclist_on_sidewalk: 'Bike on sidewalk',
+            red_light_violation: 'Red light violation', late_yellow: 'Late yellow', pedestrian_red_crossing: 'Pedestrian crossing on red'
+        };
+        const CAT = {
+            emergency: { dot: 'bg-orange-500', chip: 'bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300', hex: '#f97316' },
+            violation: { dot: 'bg-rose-500', chip: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300', hex: '#e11d48' },
+            risk: { dot: 'bg-amber-500', chip: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300', hex: '#f59e0b' },
+            info: { dot: 'bg-sky-500', chip: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300', hex: '#0ea5e9' }
+        };
+        const cat = c => CAT[c] || CAT.risk;
+        const kindLabel = k => KIND_EN[k] || (k || '?').replace(/_/g, ' ');
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const ago = ms => { const s = Math.max(0, Math.round((Date.now() - ms) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${Math.round(s / 3600)}h ago`; };
+
+        // ------------------------------------------------------------ API (with optional token)
+        let token = ''; try { token = localStorage.getItem('sc_token') || ''; } catch (e) {}
+        async function api(path, opts = {}) {
+            opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+            if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+            const r = await fetch(path, opts);
+            if (r.status === 401) { document.getElementById('tokenBar').classList.remove('hidden'); throw new Error('token required'); }
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+            return data;
+        }
+        document.getElementById('tokenSave').onclick = () => {
+            token = document.getElementById('tokenInput').value.trim();
+            try { localStorage.setItem('sc_token', token); } catch (e) {}
+            document.getElementById('tokenBar').classList.add('hidden');
+            refreshAll();
+        };
+
+        // ------------------------------------------------------------ map (OpenStreetMap)
         const cleanMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
         });
-
-        const map = L.map('map', { 
-            zoomControl: false,
-            layers: [cleanMapLayer]
-        }).setView([45.0703, 7.6869], 14);
-
+        const map = L.map('map', { zoomControl: false, layers: [cleanMapLayer] }).setView([45.0703, 7.6869], 14);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
+        window.addEventListener('resize', () => map.invalidateSize());
+        const linkLayer = L.layerGroup().addTo(map);
+        const forwardLayer = L.layerGroup().addTo(map);
 
-        // 2. Logica Dark Mode con Filtro CSS
+        // Dark mode with CSS filter on the map (same as before)
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeIcon = document.getElementById('themeIcon');
         const mapContainer = document.getElementById('map');
-
-        const isInitialDark = document.documentElement.classList.contains('dark');
-        if (isInitialDark) {
-            mapContainer.style.filter = 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)';
-        }
-
+        const DARK_FILTER = 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)';
+        if (document.documentElement.classList.contains('dark')) mapContainer.style.filter = DARK_FILTER;
         themeToggleBtn.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
             const isDark = document.documentElement.classList.contains('dark');
-            
             themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
             lucide.createIcons();
-
-            if (isDark) {
-                mapContainer.style.filter = 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)';
-            } else {
-                mapContainer.style.filter = 'none';
-            }
+            mapContainer.style.filter = isDark ? DARK_FILTER : 'none';
         });
 
-        // 3. Icona Uniforme e Ben Visibile per tutti i Peer
-        const peerIcon = L.divIcon({
-            html: `<div class="w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-xl flex items-center justify-center animate-pulse"></div>`,
-            className: '',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-        });
+        // ------------------------------------------------------------ layer toggles
+        const LAYERS = [
+            { id: 'pedestrians', label: 'Pedestrians', icon: 'user', color: 'blue', on: true },
+            { id: 'cyclists', label: 'Cyclists', icon: 'bike', color: 'emerald', on: true },
+            { id: 'ambulances', label: 'Ambulances', icon: 'ambulance', color: 'rose', on: true },
+            { id: 'vehicles', label: 'Vehicles', icon: 'car', color: 'slate', on: true },
+            { id: 'links', label: 'Intersection links', icon: 'waypoints', color: 'violet', on: true },
+            { id: 'simnodes', label: 'Simulated grid (client.py)', icon: 'grid-3x3', color: 'sky', on: true }
+        ];
+        const layerBox = document.getElementById('layerToggles');
+        layerBox.innerHTML = LAYERS.map(l => `
+            <div class="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 rounded-lg bg-${l.color}-50 dark:bg-${l.color}-950/50 text-${l.color}-600 dark:text-${l.color}-400"><i data-lucide="${l.icon}" class="w-4 h-4"></i></div>
+                    <span class="text-sm font-medium text-slate-700 dark:text-slate-200">${l.label}</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="layer_${l.id}" class="sr-only peer" ${l.on ? 'checked' : ''}>
+                    <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-${l.color}-600"></div>
+                </label>
+            </div>`).join('');
+        const layerOn = id => document.getElementById('layer_' + id).checked;
+        LAYERS.forEach(l => document.getElementById('layer_' + l.id).addEventListener('change', renderMap));
+        document.getElementById('nodeSearch').addEventListener('input', renderMap);
 
-        let markers = {};
+        // ------------------------------------------------------------ tabs
+        document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+            document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== b.dataset.tab));
+        }));
 
-        function fetchTrafficData() {
-            fetch('/api/traffic')
-                .then(res => res.json())
-                .then(data => {
-                    const searchQuery = document.getElementById('nodeSearch').value.toLowerCase();
-                    const showPed = document.getElementById('filterPedestrians').checked;
-                    const showCyc = document.getElementById('filterCyclists').checked;
-                    const showAmb = document.getElementById('filterAmbulances').checked;
+        // ------------------------------------------------------------ state
+        const S = { traffic: [], summary: null, kinds: [], fwdAfter: 0, evAfter: 0, feed: [], forwards: [],
+                    markers: {}, fitted: false, seenHaz: new Set(), firstLoad: true, online: true };
 
-                    Object.keys(markers).forEach(id => {
-                        if (searchQuery && !id.toLowerCase().includes(searchQuery)) {
-                            map.removeLayer(markers[id]);
-                            delete markers[id];
-                        }
-                    });
-
-                    data.forEach(node => {
-                        const nodeId = node.node_id.toLowerCase();
-                        
-                        if (searchQuery && !nodeId.includes(searchQuery)) return;
-
-                        let visible = false;
-                        if (showPed && node.counts.pedestrians > 0) visible = true;
-                        if (showCyc && node.counts.cyclists > 0) visible = true;
-                        if (showAmb && node.counts.ambulances > 0) visible = true;
-                        
-                        if (!visible && (showPed || showCyc || showAmb)) {
-                            if (markers[node.node_id]) {
-                                map.removeLayer(markers[node.node_id]);
-                                delete markers[node.node_id];
-                            }
-                            return;
-                        }
-
-                        const lat = node.coordinates.lat;
-                        const lon = node.coordinates.lon;
-                        const counts = node.counts;
-
-                        let metricsHtml = `
-                            <div class="min-w-[160px] font-sans overflow-hidden">
-                                <div class="px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-600">
-                                    <h3 class="font-bold text-slate-900 dark:text-white text-sm">Node ${node.node_id}</h3>
-                                    <p class="text-xs text-slate-500 dark:text-slate-300">Live Counts</p>
-                                </div>
-                                <div class="p-3 space-y-2.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="user" class="w-3.5 h-3.5 text-blue-500"></i>Pedestrians</span>
-                                        <span class="font-bold text-slate-900 dark:text-white">${counts.pedestrians}</span>
-                                    </div>
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="bike" class="w-3.5 h-3.5 text-emerald-500"></i>Cyclists</span>
-                                        <span class="font-bold text-slate-900 dark:text-white">${counts.cyclists}</span>
-                                    </div>
-                                    ${counts.ambulances > 0 ? `
-                                    <div class="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-slate-600">
-                                        <span class="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><i data-lucide="ambulance" class="w-3.5 h-3.5"></i>Ambulances</span>
-                                        <span class="font-bold text-rose-600 dark:text-rose-400">${counts.ambulances}</span>
-                                    </div>` : ''}
-                                </div>
-                            </div>
-                        `;
-
-                        if (markers[node.node_id]) {
-                            markers[node.node_id].setLatLng([lat, lon]);
-                            const popup = markers[node.node_id].getPopup();
-                            if (popup && popup.isOpen()) {
-                                popup.setContent(metricsHtml);
-                            }
-                        } else {
-                            const marker = L.marker([lat, lon], { icon: peerIcon }).addTo(map);
-                            marker.bindPopup(metricsHtml);
-
-                            marker.on('mouseover', function () {
-                                this.openPopup();
-                            });
-
-                            markers[node.node_id] = marker;
-                        }
-                    });
-                    lucide.createIcons();
-                })
-                .catch(err => console.error('Error fetching data:', err));
+        function nodeIcon(n) {
+            const local = (n.active_hazards || []).length, remote = (n.active_remote || []).length;
+            const emerg = [...(n.active_hazards || []), ...(n.active_remote || [])].some(a => a.category === 'emergency');
+            let color = 'bg-blue-600', size = 24, pulse = 'animate-pulse';
+            if (n.source === 'client') { color = 'bg-sky-500'; size = 16; }
+            else if (n.source === 'virtual' && !n.online) { color = 'bg-violet-500'; pulse = ''; }
+            else if (!n.online) { color = 'bg-slate-400'; pulse = ''; }
+            if (remote) color = 'bg-amber-500';
+            if (local) color = 'bg-rose-600';
+            if (emerg) color = 'bg-orange-500';
+            const ring = (local || remote || emerg) ? `<span class="absolute inset-0 rounded-full ${color} animate-ping opacity-60"></span>` : '';
+            return L.divIcon({
+                html: `<div class="relative" style="width:${size}px;height:${size}px">${ring}<div class="relative w-full h-full rounded-full ${color} border-2 border-white shadow-xl ${pulse}"></div></div>`,
+                className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2]
+            });
         }
 
-        setInterval(fetchTrafficData, 2000);
-        fetchTrafficData();
+        function popupHtml(n) {
+            const c = n.counts || {};
+            const row = (icon, color, label, v) => `
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="${icon}" class="w-3.5 h-3.5 text-${color}-500"></i>${label}</span>
+                    <span class="font-bold text-slate-900 dark:text-white">${v ?? 0}</span>
+                </div>`;
+            const windowLabel = { live: 'Live counts', last_period: 'Last statistics period', none: 'No data yet' }[n.counts_window] || 'Live counts';
+            const st = n.status;
+            const haz = [...(n.active_hazards || []).map(a => ({ ...a, where: 'here' })), ...(n.active_remote || []).map(a => ({ ...a, where: 'from ' + a.from_node }))];
+            return `
+                <div class="min-w-[220px] font-sans overflow-hidden">
+                    <div class="px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-600">
+                        <h3 class="font-bold text-slate-900 dark:text-white text-sm">${esc(n.name || n.node_id)}</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-300">${windowLabel} &middot; ${n.online ? 'online' : 'offline'}${n.source === 'client' ? ' &middot; simulated' : ''}</p>
+                    </div>
+                    <div class="p-3 space-y-2.5">
+                        ${layerOn('pedestrians') ? row('user', 'blue', 'Pedestrians', c.pedestrians) : ''}
+                        ${layerOn('cyclists') ? row('bike', 'emerald', 'Cyclists', c.cyclists) : ''}
+                        ${layerOn('vehicles') && c.vehicles !== undefined ? row('car', 'slate', 'Vehicles', c.vehicles) : ''}
+                        ${layerOn('ambulances') && c.ambulances > 0 ? `
+                        <div class="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-slate-600">
+                            <span class="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><i data-lucide="ambulance" class="w-3.5 h-3.5"></i>Ambulances</span>
+                            <span class="font-bold text-rose-600 dark:text-rose-400">${c.ambulances}</span>
+                        </div>` : ''}
+                        ${st ? `<div class="text-[11px] text-slate-500 dark:text-slate-400 pt-1.5 border-t border-slate-100 dark:border-slate-600">
+                            ${st.fps != null ? st.fps + ' fps' : ''} ${st.cpu_temp_c != null ? '&middot; ' + Math.round(st.cpu_temp_c) + '&deg;C' : ''}
+                            ${st.active_tracks != null ? '&middot; ' + st.active_tracks + ' tracks' : ''}</div>` : ''}
+                        ${haz.length ? `<div class="pt-1.5 border-t border-slate-100 dark:border-slate-600 space-y-1">
+                            ${haz.map(a => `<div class="flex items-center gap-1.5 text-[11px]"><span class="w-2 h-2 rounded-full ${cat(a.category).dot}"></span>
+                                <span class="font-semibold text-slate-800 dark:text-slate-100">${esc(kindLabel(a.kind))}</span>
+                                <span class="text-slate-400">${esc(a.where)}</span></div>`).join('')}</div>` : ''}
+                    </div>
+                </div>`;
+        }
 
-        document.getElementById('nodeSearch').addEventListener('input', fetchTrafficData);
-        document.getElementById('filterPedestrians').addEventListener('change', fetchTrafficData);
-        document.getElementById('filterCyclists').addEventListener('change', fetchTrafficData);
-        document.getElementById('filterAmbulances').addEventListener('change', fetchTrafficData);
+        function matchesSearch(n) {
+            const q = document.getElementById('nodeSearch').value.trim().toLowerCase();
+            return !q || String(n.node_id).toLowerCase().includes(q) || String(n.name || '').toLowerCase().includes(q);
+        }
+
+        // Simulated grid nodes keep the original behavior: shown only if a selected category is present.
+        function visibleClientNode(n) {
+            if (!layerOn('simnodes')) return false;
+            const c = n.counts || {};
+            const any = ['pedestrians', 'cyclists', 'ambulances', 'vehicles'].some(k => layerOn(k));
+            if (!any) return true;
+            return ['pedestrians', 'cyclists', 'ambulances', 'vehicles'].some(k => layerOn(k) && (c[k] || 0) > 0);
+        }
+
+        function renderMap() {
+            const byId = {};
+            S.traffic.forEach(n => byId[n.node_id] = n);
+            const keep = new Set();
+            S.traffic.forEach(n => {
+                if (!n.coordinates || !matchesSearch(n)) return;
+                if (n.source === 'client' && !visibleClientNode(n)) return;
+                keep.add(n.node_id);
+                const ll = [n.coordinates.lat, n.coordinates.lon];
+                let m = S.markers[n.node_id];
+                if (!m) {
+                    m = L.marker(ll, { icon: nodeIcon(n) }).addTo(map);
+                    m.bindPopup(popupHtml(n));
+                    m.on('mouseover', function () { this.openPopup(); });
+                    m.on('popupopen', () => lucide.createIcons());
+                    S.markers[n.node_id] = m;
+                } else {
+                    m.setLatLng(ll);
+                    m.setIcon(nodeIcon(n));
+                    m.setPopupContent(popupHtml(n));
+                }
+            });
+            Object.keys(S.markers).forEach(id => { if (!keep.has(id)) { map.removeLayer(S.markers[id]); delete S.markers[id]; } });
+
+            linkLayer.clearLayers();
+            if (layerOn('links')) {
+                const drawn = new Set();
+                S.traffic.forEach(n => Object.values(n.neighbors || {}).forEach(dst => {
+                    const b = byId[dst];
+                    if (!dst || !b || !n.coordinates || !b.coordinates) return;
+                    const key = [n.node_id, dst].sort().join('|');
+                    if (drawn.has(key)) return;
+                    drawn.add(key);
+                    L.polyline([[n.coordinates.lat, n.coordinates.lon], [b.coordinates.lat, b.coordinates.lon]],
+                        { color: '#8b5cf6', weight: 3, opacity: 0.6, dashArray: '6 8' }).addTo(linkLayer);
+                }));
+            }
+            if (!S.fitted) {
+                // Real intersections first: the simulated grid is far away and would shrink them
+                const real = S.traffic.filter(n => n.coordinates && n.source !== 'client');
+                const pts = (real.length ? real : S.traffic.filter(n => n.coordinates)).map(n => [n.coordinates.lat, n.coordinates.lon]);
+                if (pts.length) {
+                    map.invalidateSize();  // Tailwind may have resized the map after Leaflet started
+                    map.fitBounds(pts, { padding: [80, 80], maxZoom: 17 });
+                    S.fitted = true;
+                }
+            }
+            lucide.createIcons();
+        }
+
+        function animateForward(f) {
+            const a = S.traffic.find(n => n.node_id === f.from_node), b = S.traffic.find(n => n.node_id === f.to_node);
+            if (!a || !b || !a.coordinates || !b.coordinates) return;
+            const line = L.polyline([[a.coordinates.lat, a.coordinates.lon], [b.coordinates.lat, b.coordinates.lon]],
+                { color: f.action === 'cancel' ? '#64748b' : cat(f.category).hex, weight: 5, dashArray: '12 12', className: 'forward-line' }).addTo(forwardLayer);
+            setTimeout(() => forwardLayer.removeLayer(line), 5000);
+        }
+
+        function toast(title, text, category) {
+            const box = document.getElementById('toasts');
+            const el = document.createElement('div');
+            el.className = `p-3 rounded-xl shadow-xl bg-white dark:bg-slate-900 border-l-4 text-xs transition-all`;
+            el.style.borderLeftColor = cat(category).hex;
+            el.innerHTML = `<p class="font-bold text-slate-900 dark:text-white">${esc(title)}</p><p class="text-slate-500 dark:text-slate-400">${esc(text)}</p>`;
+            box.prepend(el);
+            setTimeout(() => el.remove(), 6000);
+            while (box.children.length > 4) box.lastChild.remove();
+        }
+
+        // ------------------------------------------------------------ sidebar rendering
+        function renderBanner() {
+            const boards = S.traffic.filter(n => n.source !== 'client');
+            const online = boards.filter(n => n.online).length;
+            const active = (S.summary && S.summary.active) || [];
+            const emerg = active.find(a => a.category === 'emergency');
+            const set = (bg, ping, dot, title, text, tcls, scls) => {
+                const b = document.getElementById('statusBanner');
+                b.className = `p-4 rounded-2xl border flex items-center gap-3 ${bg}`;
+                document.getElementById('statusPing').className = `animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${ping}`;
+                document.getElementById('statusDot').className = `relative inline-flex rounded-full h-3 w-3 ${dot}`;
+                const t = document.getElementById('statusTitle'); t.textContent = title; t.className = 'font-semibold ' + tcls;
+                const s = document.getElementById('statusText'); s.textContent = text; s.className = scls;
+            };
+            if (!S.online) set('bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700', 'bg-slate-400', 'bg-slate-500',
+                'Server unreachable', 'Retrying...', 'text-slate-800 dark:text-slate-200', 'text-slate-500');
+            else if (emerg) set('bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900/50', 'bg-orange-400', 'bg-orange-500',
+                'Emergency vehicle active', `At ${emerg.node} - neighbors notified`, 'text-orange-900 dark:text-orange-300', 'text-orange-700 dark:text-orange-400');
+            else if (active.length) set('bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/50', 'bg-rose-400', 'bg-rose-500',
+                `${active.length} active hazard${active.length > 1 ? 's' : ''}`, `${online}/${boards.length} intersections online`, 'text-rose-900 dark:text-rose-300', 'text-rose-700 dark:text-rose-400');
+            else set('bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50', 'bg-emerald-400', 'bg-emerald-500',
+                'System Live & Synchronized', `${online}/${boards.length} intersections online across Turin.`, 'text-emerald-900 dark:text-emerald-300', 'text-emerald-700 dark:text-emerald-400');
+        }
+
+        function renderKpis() {
+            const sum = k => S.traffic.filter(n => n.source !== 'client').reduce((a, n) => a + ((n.counts || {})[k] || 0), 0);
+            document.getElementById('kpiPed').textContent = sum('pedestrians');
+            document.getElementById('kpiCyc').textContent = sum('cyclists');
+            document.getElementById('kpiVeh').textContent = sum('vehicles');
+            const counts = (S.summary && S.summary.counts) || {};
+            document.getElementById('kpiHaz').textContent = Object.values(counts).reduce((a, b) => a + b, 0);
+            const n = ((S.summary && S.summary.active) || []).length;
+            document.getElementById('hazBadge').textContent = n ? `(${n})` : '';
+        }
+
+        function hazardCard(a, extra) {
+            return `<button class="w-full text-left p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 hover:border-blue-400" data-fly="${esc(a.node)}">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full ${cat(a.category).dot}"></span>
+                    <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">${esc(kindLabel(a.kind))}</span></span>
+                    <span class="text-[11px] px-2 py-0.5 rounded-full ${cat(a.category).chip}">sev ${esc(a.severity)}</span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${extra}</p>
+            </button>`;
+        }
+
+        function renderHazards() {
+            const active = (S.summary && S.summary.active) || [];
+            const incoming = [];
+            S.traffic.forEach(n => (n.active_remote || []).forEach(a => incoming.push({ ...a, node: n.node_id })));
+            const html = active.map(a => hazardCard(a,
+                `at <b>${esc(a.node)}</b>${a.towards ? ' &rarr; heading ' + esc(a.towards) : ''} &middot; ends in ${a.expires_in_s}s` +
+                (a.forwarded_to && a.forwarded_to.length ? ` &middot; forwarded to ${esc(a.forwarded_to.join(', '))}` : '') +
+                (a.simulated ? ' &middot; <i>simulated</i>' : '')))
+                .concat(incoming.map(a => hazardCard(a, `incoming at <b>${esc(a.node)}</b> from ${esc(a.from_node)}${a.arrives_from ? ' (arrives from ' + esc(a.arrives_from) + ')' : ''}`)));
+            document.getElementById('activeList').innerHTML = html.join('') ||
+                '<p class="text-xs text-slate-400">No active hazards right now.</p>';
+            document.querySelectorAll('[data-fly]').forEach(b => b.onclick = () => flyTo(b.dataset.fly));
+
+            document.getElementById('forwardList').innerHTML = S.forwards.slice(-12).reverse().map(f => `
+                <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                    <span class="w-2 h-2 rounded-full ${f.action === 'cancel' ? 'bg-slate-400' : cat(f.category).dot}"></span>
+                    <span class="text-slate-700 dark:text-slate-200"><b>${esc(f.from_node)}</b> &rarr; <b>${esc(f.to_node)}</b> ${esc(kindLabel(f.kind))}${f.action === 'cancel' ? ' (ended)' : ''}</span>
+                    <span class="ml-auto text-slate-400">${f.delivered ? 'delivered' : 'waiting'}</span>
+                </div>`).join('') || '<p class="text-xs text-slate-400">Nothing forwarded yet.</p>';
+
+            document.getElementById('feed').innerHTML = S.feed.slice(-25).reverse().map(e => {
+                const m = e.msg || {};
+                if (e.type === 'hazard') return `<div class="flex items-start gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                    <span class="mt-1 w-2 h-2 rounded-full ${e.action === 'cancel' ? 'bg-slate-400' : cat(m.category).dot}"></span>
+                    <div><p class="text-slate-800 dark:text-slate-100"><b>${esc(kindLabel(e.kind))}</b> ${e.action === 'cancel' ? '<span class="text-slate-400">ended</span>' : 'sev ' + esc(m.severity)}</p>
+                    <p class="text-slate-400">${esc(e.node)} &middot; ${ago(e.rx)}${e.simulated ? ' &middot; simulated' : ''}${m.norma && m.norma !== '-' ? ' &middot; ' + esc(m.norma) : ''}</p></div></div>`;
+                if (e.type === 'movement') return `<div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
+                    ${esc(m.class)} moved ${esc(m.from)} &rarr; ${esc(m.to)} &middot; ${ago(e.rx)}</div>`;
+                return '';
+            }).join('') || '<p class="text-xs text-slate-400">Waiting for events...</p>';
+        }
+
+        function ledHtml(st) {
+            const modes = (st && st.leds && st.leds.modes) || null;
+            if (!modes) return '<span class="text-slate-400">no LED data</span>';
+            const cls = ['', 'on', 'slow', 'fast'];
+            return modes.map((m, i) => `<span title="LED ${i + 1}" class="led ${cls[m] || ''}"></span>`).join(' ');
+        }
+
+        function renderNodes() {
+            const boards = S.traffic.filter(n => n.source !== 'client');
+            document.getElementById('nodeCards').innerHTML = boards.map(n => {
+                const st = n.status || {};
+                const warn = (st.warnings || []).map(w => `<p class="text-amber-600 dark:text-amber-400">&#9888; ${esc(w)}</p>`).join('');
+                return `<button class="w-full text-left p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 hover:border-blue-400 space-y-1.5" data-fly="${esc(n.node_id)}">
+                    <div class="flex items-center justify-between">
+                        <span class="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            <span class="w-2.5 h-2.5 rounded-full ${n.online ? 'bg-emerald-500' : n.source === 'virtual' ? 'bg-violet-500' : 'bg-slate-400'}"></span>${esc(n.name || n.node_id)}</span>
+                        <span class="text-[11px] text-slate-400">${n.online ? 'online' : n.source === 'virtual' ? 'virtual' : (n.last_seen ? 'seen ' + ago(n.last_seen) : 'never seen')}</span>
+                    </div>
+                    ${n.status ? `<p class="text-xs text-slate-500 dark:text-slate-400">${st.fps != null ? st.fps + ' fps' : '- fps'} &middot; ${st.cpu_temp_c != null ? Math.round(st.cpu_temp_c) + '&deg;C' : '-'} &middot; ${st.active_tracks ?? 0} tracks
+                        &middot; server ${st.server_online ? '&#10003;' : '&#10007;'} &middot; p2p ${st.p2p_online ? '&#10003;' : '&#10007;'}</p>
+                    <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">LEDs ${ledHtml(st)}</div>` : ''}
+                    ${warn ? `<div class="text-xs">${warn}</div>` : ''}
+                </button>`;
+            }).join('') || '<p class="text-xs text-slate-400">No intersections yet.</p>';
+            document.querySelectorAll('#nodeCards [data-fly]').forEach(b => b.onclick = () => flyTo(b.dataset.fly));
+        }
+
+        async function renderStats() {
+            const sel = document.getElementById('statsNode');
+            const boards = S.traffic.filter(n => n.source !== 'client');
+            const cur = sel.value;
+            const opts = boards.map(n => n.node_id);
+            if ([...sel.options].map(o => o.value).join() !== opts.join()) {
+                sel.innerHTML = opts.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+                if (opts.includes(cur)) sel.value = cur;
+            }
+            const id = sel.value;
+            if (!id) return;
+            let stats = null;
+            try { const r = await api('/api/nodes'); stats = ((r.nodes || []).find(n => n.id === id) || {}).stats; } catch (e) { return; }
+            const box = document.getElementById('statsBox');
+            if (!stats || !stats.cameras) { box.innerHTML = '<p class="text-slate-400">Waiting for the first statistics period...</p>'; return; }
+            const parts = [];
+            Object.entries(stats.cameras).forEach(([cam, c]) => {
+                const counts = Object.entries(c.counts || {}).filter(([, v]) => v).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(' &middot; ') || 'no objects';
+                const moves = Object.entries(c.movements || {}).map(([mv, o]) => `${esc(mv)}: ${Object.entries(o).map(([k, v]) => esc(k) + ' ' + v).join(', ')}`).join('<br>');
+                const speeds = Object.entries(c.speeds || {}).map(([k, v]) => `${esc(k)} avg ${v.mean} / V85 <b>${v.p85}</b> ${esc(v.unit || '')}`).join('<br>');
+                const xing = Object.entries(c.crosswalk_crossings || {}).map(([d, o]) => `${esc(d)}: ${Object.values(o).reduce((a, b) => a + b, 0)}`).join(' &middot; ');
+                parts.push(`<p class="font-semibold text-slate-800 dark:text-slate-100">${esc(cam)} &middot; last ${Math.round(stats.period_s || 0)} s</p>
+                    <p>${counts}</p>${moves ? `<p class="text-slate-500">Movements:<br>${moves}</p>` : ''}
+                    ${speeds ? `<p class="text-slate-500">Speeds:<br>${speeds}</p>` : ''}${xing ? `<p class="text-slate-500">Crosswalk: ${xing}</p>` : ''}`);
+            });
+            const ev = Object.entries(stats.events || {}).map(([k, v]) => `${esc(kindLabel(k))} ${v}`).join(' &middot; ');
+            box.innerHTML = parts.join('') + (ev ? `<p class="text-rose-600 dark:text-rose-400">Hazards: ${ev}</p>` : '');
+        }
+        document.getElementById('statsNode').addEventListener('change', renderStats);
+
+        function flyTo(id) {
+            const n = S.traffic.find(x => x.node_id === id);
+            if (n && n.coordinates) { map.flyTo([n.coordinates.lat, n.coordinates.lon], 17); const m = S.markers[id]; if (m) setTimeout(() => m.openPopup(), 600); }
+        }
+
+        // ------------------------------------------------------------ simulation
+        function fillSimForm() {
+            const ids = S.traffic.filter(n => n.source !== 'client').map(n => n.node_id);
+            const from = document.getElementById('simFrom'), to = document.getElementById('simTo');
+            if ([...from.options].length !== ids.length) {
+                from.innerHTML = ids.map(id => `<option>${esc(id)}</option>`).join('');
+                to.innerHTML = '<option value="">(by direction)</option>' + ids.map(id => `<option>${esc(id)}</option>`).join('');
+                if (ids.includes('incrocio-2')) from.value = 'incrocio-2';
+                if (ids.includes('incrocio-1')) to.value = 'incrocio-1';
+            }
+            const kinds = document.getElementById('simKind');
+            if (!kinds.options.length && S.kinds.length) {
+                kinds.innerHTML = S.kinds.map(k => `<option value="${esc(k.kind)}">${esc(kindLabel(k.kind))}</option>`).join('');
+                kinds.value = 'bike_lane_invasion';
+            }
+            const sims = ((S.summary && S.summary.active) || []).filter(a => a.simulated);
+            document.getElementById('simActive').innerHTML = sims.map(a => `
+                <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                    <span class="w-2 h-2 rounded-full ${cat(a.category).dot}"></span>
+                    <span class="text-slate-700 dark:text-slate-200">${esc(kindLabel(a.kind))} @ ${esc(a.node)} &rarr; ${esc((a.forwarded_to || []).join(', ') || '-')}</span>
+                    <button class="ml-auto px-2 py-1 rounded-md bg-slate-200 dark:bg-slate-700 font-semibold" data-end="${esc(a.id)}">End</button>
+                </div>`).join('') || '<p class="text-slate-400">None.</p>';
+            document.querySelectorAll('[data-end]').forEach(b => b.onclick = async () => {
+                try { await api('/api/simulate', { method: 'POST', body: JSON.stringify({ action: 'cancel', id: b.dataset.end }) }); refreshAll(); }
+                catch (e) { document.getElementById('simResult').textContent = 'Error: ' + e.message; }
+            });
+        }
+        document.getElementById('simGo').onclick = async () => {
+            const body = {
+                from_node: document.getElementById('simFrom').value, to_node: document.getElementById('simTo').value || null,
+                kind: document.getElementById('simKind').value, severity: Number(document.getElementById('simSev').value),
+                towards: document.getElementById('simTowards').value.trim() || null
+            };
+            const out = document.getElementById('simResult');
+            try {
+                const r = await api('/api/simulate', { method: 'POST', body: JSON.stringify(body) });
+                const to = (r.delivered_to || []).map(d => d.node).join(', ');
+                out.textContent = to ? `Sent: delivered to ${to}.` : (r.warning || 'Sent, no recipient.');
+                refreshAll();
+            } catch (e) { out.textContent = 'Error: ' + e.message; }
+        };
+
+        // ------------------------------------------------------------ polling
+        async function refreshAll() {
+            try {
+                const [traffic, summary] = await Promise.all([api('/api/traffic'), api('/api/summary')]);
+                S.traffic = traffic; S.summary = summary; S.online = true;
+                (summary.active || []).forEach(a => {
+                    const key = a.node + '|' + a.id;
+                    if (!S.seenHaz.has(key)) {
+                        S.seenHaz.add(key);
+                        if (!S.firstLoad) toast(kindLabel(a.kind), `${a.node}${a.forwarded_to && a.forwarded_to.length ? ' → ' + a.forwarded_to.join(', ') : ''}`, a.category);
+                    }
+                });
+                const fw = await api(`/api/forwards?after=${S.fwdAfter}&limit=50`);
+                if (!S.firstLoad) (fw.forwards || []).forEach(animateForward);
+                S.forwards = S.forwards.concat(fw.forwards || []).slice(-60);
+                S.fwdAfter = fw.last || S.fwdAfter;
+                const ev = await api(`/api/events?after=${S.evAfter}&limit=100&type=hazard,movement`);
+                S.feed = S.feed.concat(ev.messages || []).slice(-80);
+                S.evAfter = ev.last || S.evAfter;
+                S.firstLoad = false;
+            } catch (e) {
+                if (e.message !== 'token required') S.online = false;
+            }
+            renderMap(); renderBanner(); renderKpis(); renderHazards(); renderNodes(); fillSimForm();
+            if (!S.statsStarted && S.traffic.length) { S.statsStarted = true; renderStats(); }
+        }
+
+        api('/api/kinds').then(r => { S.kinds = r.kinds || []; fillSimForm(); }).catch(() => {});
+        refreshAll();
+        setInterval(refreshAll, 2000);
+        renderStats();
+        setInterval(renderStats, 10000);
     </script>
 </body>
 </html>

@@ -1,0 +1,26 @@
+{
+  "_note": "neighbors: {nome della via (come negli approaches del config del nodo): incrocio a cui porta}. null = la via esce dalla rete (nessun inoltro). virtual = incrocio senza board, si simula dalla dashboard. lat/lon = posizione sulla mappa di Torino; pos = posizione nella console (0..1). Il file si puo' modificare a server acceso: viene ricaricato da solo.",
+  "forward_unknown_direction": true,
+  "nodes": {
+    "incrocio-1": {
+      "name": "Incrocio 1 - Via Vincenzo Vela (board)",
+      "lat": 45.06438, "lon": 7.66834,
+      "pos": [0.5, 0.5],
+      "neighbors": {"via": "incrocio-2", "incrocio": "incrocio-3"}
+    },
+    "incrocio-2": {
+      "name": "Incrocio 2",
+      "virtual": true,
+      "lat": 45.06440, "lon": 7.66640,
+      "pos": [0.14, 0.5],
+      "neighbors": {"est": "incrocio-1", "ovest": null}
+    },
+    "incrocio-3": {
+      "name": "Incrocio 3",
+      "virtual": true,
+      "lat": 45.06436, "lon": 7.67030,
+      "pos": [0.86, 0.5],
+      "neighbors": {"ovest": "incrocio-1", "est": null}
+    }
+  }
+}

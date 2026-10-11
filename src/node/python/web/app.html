@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<title>Smart Crossing</title>
+<!--
+  App per telefono del nodo Smart Crossing (servita dall'API locale del nodo su GET /app).
+  Nessuna dipendenza esterna: funziona anche senza internet, basta la rete locale dell'incrocio.
+  Legge GET /api/events?since=<ms>&limit=<n> ogni secondo e GET /api/status ogni 10 s.
+  Parametro opzionale ?api=http://ip:8100 per usare un nodo su un'altra origine (test).
+-->
+<style>
+  :root {
+    --bg: #f3f5f7; --fg: #111418; --muted: #5b6570; --card: #ffffff; --line: #d5dbe1;
+    --ok: #1f9d55; --ko: #d7263d; --accent: #1e6fd9; --calm: #e3f4ea; --calm-fg: #145c34;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101418; --fg: #f1f4f7; --muted: #9aa5b1; --card: #1b2128; --line: #2c343d;
+      --calm: #15291e; --calm-fg: #8fdcae;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 18px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; min-height: 100vh;
+         padding-bottom: env(safe-area-inset-bottom); }
+  button { font: inherit; cursor: pointer; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px;
+           padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--line); font-size: 15px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--ko); flex: none; }
+  .dot.on { background: var(--ok); }
+  #conn { font-weight: 600; }
+  #node { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  #change { border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 8px;
+            padding: 6px 12px; font-size: 15px; }
+  main { padding: 16px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 2rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.2rem; margin: 24px 0 10px; }
+  .lead, .note { color: var(--muted); }
+  .note:empty { display: none; }
+  .profiles { display: grid; gap: 10px; }
+  .profiles button { padding: 18px; font-size: 1.4rem; font-weight: 700; text-align: left; border-radius: 14px;
+                     border: 2px solid var(--line); background: var(--card); color: var(--fg); }
+  .profiles button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent) inset; }
+  .opt { display: flex; align-items: center; gap: 10px; margin: 18px 0; font-size: 1.1rem; }
+  .opt input { width: 24px; height: 24px; }
+  .big { width: 100%; padding: 22px; font-size: 1.6rem; font-weight: 800; border: 0; border-radius: 16px;
+         background: var(--accent); color: #fff; }
+  .big:disabled { opacity: .4; }
+  .banner { border-radius: 16px; padding: 18px 18px 14px; margin-bottom: 12px; color: #fff; }
+  .banner .tag { font-size: .85rem; font-weight: 800; letter-spacing: .08em; opacity: .9; }
+  .banner .title { font-size: 1.75rem; font-weight: 800; line-height: 1.15; margin: 6px 0; }
+  .banner .advice { font-size: 1.15rem; }
+  .banner .meta { font-size: .95rem; margin-top: 10px; opacity: .9; }
+  .cat-emergency { background: #e8650a; animation: flash 1s infinite; }
+  .cat-violation { background: #c81e32; }
+  .cat-risk { background: #ffb000; color: #1d1600; }
+  .cat-info { background: #1e6fd9; }
+  @keyframes flash { 50% { background: #ff8c1a; } }
+  @media (prefers-reduced-motion: reduce) { .cat-emergency { animation: none; } }
+  #calm { border-radius: 16px; padding: 28px 18px; text-align: center; background: var(--calm); color: var(--calm-fg); }
+  #calm .big-txt { font-size: 1.8rem; font-weight: 800; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <span id="dot" class="dot"></span>
+  <span id="conn">Non collegato</span>
+  <span id="node"></span>
+  <button id="change" hidden>Profilo</button>
+</header>
+
+<main id="setup">
+  <h1>Smart Crossing</h1>
+  <p class="lead">Ricevi sul telefono gli avvisi di pericolo dell'incrocio, anche senza internet.</p>
+  <h2>Come ti muovi?</h2>
+  <div class="profiles" id="profiles">
+    <button data-p="cyclist" aria-pressed="false">Ciclista</button>
+    <button data-p="person" aria-pressed="false">Pedone</button>
+    <button data-p="vehicle" aria-pressed="false">Conducente</button>
+  </div>
+  <label class="opt"><input type="checkbox" id="sound"> Avviso sonoro</label>
+  <button id="start" class="big" disabled>Avvia</button>
+  <p id="setupNote" class="note"></p>
+</main>
+
+<main id="live" hidden>
+  <div id="banners"></div>
+  <div id="calm">
+    <div class="big-txt">Nessun pericolo</div>
+    <div id="calmSub"></div>
+  </div>
+  <p id="liveNote" class="note"></p>
+</main>
+
+<script>
+'use strict';
+const PROFILES = { cyclist: 'Ciclista', person: 'Pedone', vehicle: 'Conducente' };
+const CATEGORIES = { emergency: 'EMERGENZA', violation: 'INFRAZIONE', risk: 'RISCHIO', info: 'INFORMAZIONE' };
+// kind (events.py KINDS) -> [descrizione, consiglio]
+const KIND_TXT = {
+  emergency_vehicle: ['Mezzo di soccorso in arrivo', 'Fermati e lascia libera la strada'],
+  speeding: ['Veicolo ad alta velocità', 'Attenzione prima di attraversare'],
+  sudden_acceleration: ['Veicolo che accelera di colpo', 'Fai attenzione ai veicoli in partenza'],
+  harsh_braking: ['Frenata brusca', 'Possibile pericolo più avanti'],
+  solid_line_crossing: ['Veicolo che supera la linea continua', 'Possibili manovre improvvise'],
+  wrong_way: ['Veicolo contromano', 'Massima attenzione: arriva dal lato sbagliato'],
+  u_turn: ['Inversione a U vietata', 'Un veicolo sta tornando indietro'],
+  forbidden_movement: ['Manovra vietata in corso', 'Un veicolo fa una svolta non permessa'],
+  bike_lane_invasion: ['Veicolo nella pista ciclabile', 'Rallenta e tieni la distanza'],
+  bike_lane_hotspot: ['Pista ciclabile spesso occupata', 'Zona critica per chi va in bici'],
+  illegal_stop: ['Veicolo fermo in sosta vietata', 'Visuale ridotta: attraversa con prudenza'],
+  congestion: ['Traffico intenso', 'Coda all\'incrocio'],
+  pedestrian_not_yielded: ['Precedenza negata a un pedone', 'Attraversa solo quando i veicoli si fermano'],
+  near_miss: ['Quasi incidente appena avvenuto', 'Situazione pericolosa all\'incrocio'],
+  collision_risk: ['Rischio di collisione', 'Fermati e guarda bene'],
+  close_pass: ['Sorpasso troppo vicino a un ciclista', 'Tieni la destra con attenzione'],
+  pedestrian_outside_crosswalk: ['Pedone fuori dalle strisce', 'Rallenta: persona sulla carreggiata'],
+  slow_pedestrian: ['Pedone lento sulle strisce', 'Aspetta che finisca di attraversare'],
+  pedestrian_waiting: ['Pedone in attesa di attraversare', 'Rallenta e dai la precedenza'],
+  crowd_on_crosswalk: ['Molte persone sulle strisce', 'Rallenta e preparati a fermarti'],
+  cyclist_on_sidewalk: ['Ciclista sul marciapiede', 'Attenzione camminando'],
+  red_light_violation: ['Veicolo passato col rosso', 'Non fidarti del verde: guarda prima di passare'],
+  late_yellow: ['Veicolo passato col giallo tardivo', 'Attenzione allo scatto del verde'],
+  pedestrian_red_crossing: ['Pedone che attraversa col rosso', 'Rallenta: persona sulla carreggiata'],
+};
+const VIBRATION = { emergency: [600, 200, 600, 200, 600], 3: [200, 100, 200, 100, 200], 2: [200, 100, 200] };
+const API = (new URLSearchParams(location.search).get('api') || '').replace(/\/+$/, '');
+const LIMIT = 200, LOOKBACK_MS = 10000, HISTORY_MS = 600000, POLL_MS = 1000, STATUS_MS = 10000;
+const DEFAULT_VALIDITY_MS = 30000;
+const canVibrate = typeof navigator.vibrate === 'function';
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* modalita' privata */ } },
+};
+
+let profile = PROFILES[store.get('sc_profile')] ? store.get('sc_profile') : null;
+let soundOn = false, audio = null, wakeLock = null;
+let gen = 0;                 // generazione del ciclo di polling (cambio profilo = nuovo ciclo)
+let skew = 0;                // orologio del nodo - orologio del telefono (ms), dall'header Date
+let lastTs = null, fullPage = false, lastOk = 0, statusAt = 0, serverOnline = null;
+const seen = new Map();      // "id|azione" gia' visti
+const active = new Map();    // id -> {m, until} avvisi da mostrare
+
+const nodeNow = () => Date.now() + skew;
+const rank = (m) => (m.category === 'emergency' ? 10 : 0) + (Number(m.severity) || 1);
+
+// ---------------------------------------------------------------- rete
+
+async function getJSON(path) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetch(API + path, { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = Date.parse(r.headers.get('Date') || '');  // risoluzione 1 s: +500 ms in media
+    if (!isNaN(d)) skew = d + 500 - Date.now();
+    return await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// la lista puo' arrivare nuda o dentro un oggetto ({"items": [...]} ecc.)
+function listOf(d) {
+  if (Array.isArray(d)) return d;
+  if (d && typeof d === 'object') {
+    for (const k of ['items', 'events', 'messages', 'data', 'results']) if (Array.isArray(d[k])) return d[k];
+  }
+  return [];
+}
+
+async function loadStatus() {
+  statusAt = Date.now();
+  try {
+    const s = await getJSON('/api/status');
+    lastOk = Date.now();
+    const id = s && (s.node || (s.status && s.status.node));
+    if (id) $('node').textContent = id;
+    serverOnline = s && typeof s.server_online === 'boolean' ? s.server_online : null;
+  } catch (e) {
+    statusAt -= STATUS_MS / 2;  // riprova prima
+  }
+}
+
+async function poll(g) {
+  if (g !== gen) return;
+  try {
+    if (Date.now() - statusAt > STATUS_MS) await loadStatus();
+    if (lastTs === null) lastTs = nodeNow() - HISTORY_MS;
+    // un po' di margine all'indietro per i pericoli remoti salvati in ritardo (doppioni scartati da "seen")
+    const since = Math.max(0, Math.floor(lastTs - (fullPage ? 0 : LOOKBACK_MS)));
+    const items = listOf(await getJSON(`/api/events?since=${since}&limit=${LIMIT}`));
+    if (g !== gen) return;
+    fullPage = items.length >= LIMIT;
+    let loudest = null;
+    for (const m of items) {
+      if (!m || typeof m !== 'object') continue;
+      const ts = Number(m.ts);
+      if (ts > lastTs) lastTs = Math.min(ts, nodeNow() + 5000);
+      const fresh = handle(m);
+      if (fresh && (!loudest || rank(fresh) > rank(loudest))) loudest = fresh;
+    }
+    if (loudest) alarm(loudest);
+    lastOk = Date.now();
+  } catch (e) { /* nodo non raggiungibile: lo dice il pallino rosso */ }
+  render();
+  setTimeout(() => poll(g), POLL_MS);
+}
+
+// ritorna il messaggio se e' un nuovo avviso da mostrare
+function handle(m) {
+  if (m.type !== 'hazard' && m.type !== 'remote_hazard') return null;
+  const id = String(m.id || ''), action = m.action || 'new';
+  if (!id || seen.has(id + '|' + action)) return null;
+  remember(id + '|' + action);
+  if (action === 'cancel') {        // la situazione e' finita: tolgo il banner
+    remember(id + '|new');          // e ignoro un "new" arrivato in ritardo
+    active.delete(id);
+    return null;
+  }
+  if (action !== 'new') return null;
+  const targets = Array.isArray(m.targets) ? m.targets : [];
+  if (targets.length && !targets.includes(profile)) return null;
+  const until = Number(m.expires) || nodeNow() + DEFAULT_VALIDITY_MS;
+  if (until <= nodeNow()) return null;
+  active.set(id, { m, until });
+  return m;
+}
+
+function remember(key) {
+  seen.set(key, 1);
+  if (seen.size > 3000) for (const k of [...seen.keys()].slice(0, 1500)) seen.delete(k);
+}
+
+// ---------------------------------------------------------------- avvisi
+
+function alarm(m) {
+  const sev = Number(m.severity) || 1;
+  const pattern = m.category === 'emergency' ? VIBRATION.emergency : sev >= 3 ? VIBRATION[3] : sev >= 2 ? VIBRATION[2] : null;
+  if (!pattern) return;  // severita' 1: solo banner
+  if (canVibrate) { try { navigator.vibrate(pattern); } catch (e) { /* ignorato */ } }
+  if (soundOn) beep(pattern);
+}
+
+// stesso ritmo della vibrazione, con un tono (utile su iPhone, che non vibra)
+function beep(pattern) {
+  if (!audio) return;
+  let t = audio.currentTime + 0.05;
+  pattern.forEach((ms, i) => {
+    if (i % 2 === 0) {
+      const osc = audio.createOscillator(), gain = audio.createGain();
+      osc.frequency.value = 880;
+      gain.gain.value = 0.25;
+      osc.connect(gain).connect(audio.destination);
+      osc.start(t);
+      osc.stop(t + ms / 1000);
+    }
+    t += ms / 1000;
+  });
+}
+
+function source(m) {
+  if (m.type === 'hazard') return 'Questo incrocio';
+  return 'Incrocio vicino ' + (m.from_node || m.node || '');
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;  // mai innerHTML con dati ricevuti
+  return e;
+}
+
+function render() {
+  const now = nodeNow();
+  for (const [id, a] of active) if (a.until <= now) active.delete(id);
+  const list = [...active.values()].sort((a, b) => rank(b.m) - rank(a.m) || (Number(b.m.ts) || 0) - (Number(a.m.ts) || 0));
+  const box = $('banners');
+  box.replaceChildren(...list.map(({ m }) => {
+    const cat = CATEGORIES[m.category] ? m.category : 'info';
+    const [title, advice] = KIND_TXT[m.kind] || [String(m.kind || 'Pericolo').replace(/_/g, ' '), ''];
+    const age = Math.round((now - Number(m.ts)) / 1000);
+    const b = el('div', 'banner cat-' + cat);
+    b.append(el('div', 'tag', `${CATEGORIES[cat]} · LIVELLO ${Number(m.severity) || 1}`),
+      el('div', 'title', title), el('div', 'advice', advice),
+      el('div', 'meta', source(m) + (age >= 0 && age < 3600 ? ` · ${age} s fa` : '')));
+    return b;
+  }));
+  $('calm').hidden = list.length > 0;
+  const ok = Date.now() - lastOk < 3500;
+  $('dot').classList.toggle('on', ok);
+  $('conn').textContent = !ok ? 'Nodo non raggiungibile' : serverOnline === false ? 'Collegato (server offline)' : 'Collegato';
+}
+
+// ---------------------------------------------------------------- avvio
+
+async function keepAwake() {
+  if (!('wakeLock' in navigator)) return false;
+  try { wakeLock = await navigator.wakeLock.request('screen'); return true; } catch (e) { return false; }
+}
+
+function showSetup() {
+  gen++;  // ferma il ciclo di polling in corso
+  $('live').hidden = true; $('change').hidden = true; $('setup').hidden = false;
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  for (const b of document.querySelectorAll('#profiles button')) b.setAttribute('aria-pressed', String(b.dataset.p === profile));
+  $('start').disabled = !profile;
+  const v = store.get('sc_sound');
+  $('sound').checked = v === null ? !canVibrate : v === '1';
+  $('setupNote').textContent = canVibrate ? '' :
+    'Questo telefono non può vibrare da una pagina web (es. iPhone): riceverai avvisi visivi e, se attivo, sonori.';
+}
+
+$('profiles').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button[data-p]');
+  if (!b) return;
+  profile = b.dataset.p;
+  store.set('sc_profile', profile);
+  for (const x of document.querySelectorAll('#profiles button')) x.setAttribute('aria-pressed', String(x === b));
+  $('start').disabled = false;
+});
+
+$('start').addEventListener('click', async () => {
+  if (!profile) return;
+  if (canVibrate) { try { navigator.vibrate(80); } catch (e) { /* ignorato */ } }  // conferma al tocco
+  soundOn = $('sound').checked;
+  store.set('sc_sound', soundOn ? '1' : '0');
+  if (soundOn) {
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); await audio.resume(); } catch (e) { audio = null; }
+  }
+  const awake = await keepAwake();
+  seen.clear(); active.clear(); lastTs = null; fullPage = false;
+  $('setup').hidden = true; $('live').hidden = false; $('change').hidden = false;
+  $('calmSub').textContent = `Profilo: ${PROFILES[profile]} · in ascolto`;
+  const notes = [];
+  if (!canVibrate) notes.push('Vibrazione non disponibile su questo telefono: tieni d\'occhio lo schermo.');
+  if (!awake) notes.push('Tieni lo schermo acceso e la pagina aperta: lo spegnimento automatico dello schermo non si può bloccare da qui' +
+    (window.isSecureContext ? '.' : ' (serve HTTPS).'));
+  $('liveNote').textContent = notes.join(' ');
+  render();
+  poll(++gen);
+});
+
+$('change').addEventListener('click', showSetup);
+
+// il wake lock si perde quando la pagina va in secondo piano: lo riprendo al ritorno
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !$('live').hidden) keepAwake();
+});
+
+showSetup();
+loadStatus().then(render);  // gia' nella prima schermata: id del nodo e pallino verde/rosso
+</script>
+</body>
+</html>

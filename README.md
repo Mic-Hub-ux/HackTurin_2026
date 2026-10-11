@@ -56,6 +56,63 @@ The hardware prototype consists of the following components:
 
 --- 
 
+# Repository Structure
+
+```
+src/
+  node/        edge software for the Arduino UNO Q (App Lab app: python/ + sketch/), PC tools, SPEC.md
+  server/      central server: server.py (standard library, works offline) + flask_app.py (PythonAnywhere),
+               map dashboard (/), cyclist view (/cyclist), phone alerts (/app), offline console (/console)
+  firmware/    ESP32 radio gateway (ESP-NOW), ESP32 vibrating wristband, UNO R4 WiFi as a second intersection
+  client/      load test: 12 simulated intersections posting to /api/traffic
+  dataset/     dataset builder for Edge Impulse (Open Images + Roboflow + own videos)
+docs/          step-by-step guides (Italian): PIANO.md, TUTORIAL.md, GUIDA_DEMO.md
+```
+
+# Quick Start
+
+```bash
+cd src/server
+python server.py --port 8000
+```
+Dashboard: `http://localhost:8000` · cyclist view: `/cyclist` · phone alerts: `/app?node=incrocio-1` · offline console: `/console`.
+
+Simulated grid of 12 intersections on the local server:
+```bash
+SC_TRAFFIC_URL=http://localhost:8000/api/traffic python src/client/client.py
+```
+
+Full node pipeline on a video, without the board (YOLO on the PC, same rules as the UNO Q):
+```bash
+python src/node/tools/replay.py video.mp4 --server http://127.0.0.1:8000
+```
+
+Automated tests (no hardware needed): `python src/node/tools/test_suite.py`.
+Deploying on the UNO Q, the LEDs, the ESP32 wristbands and the UNO R4: see [docs/GUIDA_DEMO.md](docs/GUIDA_DEMO.md).
+
+# What a Node Understands
+
+The node tracks every object over time (ground point, homography to meters, tracker robust to 2-5 FPS) and raises
+C-ITS-style hazard events (ETSI cause codes), each with a lifecycle (new / cancel), the users it concerns and whether
+it must be forwarded to the intersection the vehicle is heading to:
+
+| Event | Example |
+|---|---|
+| speeding, sudden acceleration, harsh braking | km/h with calibration, relative speed without |
+| solid line crossing, wrong way, U-turn, forbidden turn | lanes and lines drawn on the camera view |
+| bike lane invasion (repeated, hotspot), close pass on a cyclist (< 1.5 m) | cyclist safety |
+| pedestrian not yielded, near miss, predicted collision risk | vulnerable road users |
+| pedestrian outside crosswalk, slow pedestrian, crowd, pedestrian waiting | crossing behaviour |
+| illegal stop on crosswalk / bike lane, congestion | lifecycle new -> cancel |
+| emergency vehicle | orange LED, forwarded along its route |
+
+Every closed track produces a summary (entry/exit street, speed with V85, time per zone, crosswalk crossing with
+direction, trajectory); statistics and a heatmap are aggregated every minute. Hazards travel to the server over HTTP
+(store-and-forward when offline) and directly between intersections and wristbands over the SC-P2P protocol
+(UDP multicast on the LAN or ESP-NOW without any network).
+
+--- 
+
 ## Contributors
 
 * [Belli Gabriele](https://github.com/sGabellee)

@@ -1,3 +1,4 @@
+import os
 import random
 import requests
 import multiprocessing as mp
@@ -5,7 +6,8 @@ import time
 import statistics
 from queue import Empty
 
-URL = "https://michubux.pythonanywhere.com/api/traffic"
+# Server di destinazione: per il server locale  SC_TRAFFIC_URL=http://localhost:8000/api/traffic
+URL = os.environ.get("SC_TRAFFIC_URL", "https://michubux.pythonanywhere.com/api/traffic")
 
 NUM_NODES = 12
 DURATION = 60

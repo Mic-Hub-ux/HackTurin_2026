@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Archivi e code dei nodi e del server (dati locali, non vanno su GitHub)
+*.db
+*.db-wal
+*.db-shm
+events.jsonl
+events.jsonl.1
+outbox.jsonl
+rejected.jsonl
+
+# Output degli strumenti sul PC
+src/node/tools/replay_out/
+src/node/tools/config_*.json
+src/node/tools/foto*.png
+export/
+heatmap*.png
+
+# Dataset e video (pesanti e con immagini di terzi: restano fuori dalla repo)
+src/dataset/dataset_oi/
+src/dataset/foto_nostre/
+src/dataset/roboflow/
+src/dataset/video/
+*.mp4
+*.pt
