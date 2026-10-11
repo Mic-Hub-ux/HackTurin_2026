@@ -1,86 +1,49 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, render_template, request, jsonify
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
-# Database in memoria (per il prototipo dell'hackathon)
-# Qui accumuliamo i dati ricevuti dai nodi sparsi per la città
-traffic_data_store = []
+# Segreto condiviso per la sicurezza delle comunicazioni IoT
+API_SECRET_TOKEN = "efesto-secure-iot-key-2026"
 
+# Memoria in-memory per i dati dei nodi
+nodes_data = {}
 
-@app.route("/", methods=["GET"])
-def home():
-  return render_template("index.html")
+@app.route('/')
+def index():
+    return render_template('index.html')
 
+@app.route('/cyclist')
+def cyclist():
+    return render_template('cyclist.html')
 
-@app.route("/cyclist", methods=["GET"])
-def cyclist_view():
-  return render_template("cyclist.html")
+@app.route('/api/traffic', methods=['GET', 'POST'])
+def traffic():
+    if request.method == 'POST':
+        # Controllo di sicurezza: verifica il token nell'header Authorization
+        auth_header = request.headers.get('Authorization')
+        expected_auth = f"Bearer {API_SECRET_TOKEN}"
+        
+        if not auth_header or auth_header != expected_auth:
+            return jsonify({"error": "Unauthorized - Invalid or missing token"}), 403
 
+        data = request.json
+        if not data or 'node_id' not in data:
+            return jsonify({"error": "Invalid payload"}), 400
+        
+        node_id = data['node_id']
+        nodes_data[node_id] = data
+        return jsonify({"status": "success", "node_id": node_id}), 200
 
-@app.route("/api/traffic", methods=["POST"])
-def receive_traffic_data():
-  """Endpoint API per ricevere i dati dai nodi smart crossing (peer)."""
-  data = request.get_json()
+    elif request.method == 'GET':
+        # Restituisce la lista dei nodi attivi per le dashboard (index e cyclist)
+        return jsonify(list(nodes_data.values())), 200
 
-  if not data:
-    return jsonify({"error": "Invalid JSON or missing payload"}), 400
+@app.route('/api/traffic/<node_id>', methods=['GET'])
+def node_traffic(node_id):
+    node = nodes_data.get(node_id)
+    if not node:
+        return jsonify({"error": "Node not found"}), 404
+    return jsonify(node), 200
 
-  node_id = data.get("node_id")
-  coordinates = data.get("coordinates")
-  counts = data.get("counts")
-
-  if not node_id or not counts:
-    return jsonify({"error": "Missing required fields (node_id or counts)"}), 400
-
-  # Check if the node already exists in our store
-  existing_node = next(
-      (item for item in traffic_data_store if item["node_id"] == node_id), None
-  )
-
-  if existing_node:
-    # Update existing node's data with the latest payload
-    if coordinates:
-      existing_node["coordinates"] = coordinates
-    existing_node["counts"] = counts
-  else:
-    # Add a new record if it doesn't exist yet
-    record = {
-        "node_id": node_id,
-        "coordinates": coordinates,
-        "counts": counts,
-    }
-    traffic_data_store.append(record)
-
-  print(f"[DATA RECEIVED] From Node {node_id}: {counts}")
-
-  return (
-      jsonify({
-          "status": "success",
-          "message": "Data recorded successfully",
-          "total_active_nodes": len(traffic_data_store),
-      }),
-      201,
-  )
-
-
-@app.route("/api/traffic", methods=["GET"])
-def get_traffic_data():
-  """Endpoint per restituire tutti i dati accumulati (utilizzabile per la mappa)"""
-  return jsonify(traffic_data_store), 200
-
-
-@app.route("/api/traffic/<node_id>", methods=["GET"])
-def get_node_traffic(node_id):
-  """API endpoint to fetch the latest traffic data for a specific node/intersection."""
-  node_data = next(
-      (item for item in traffic_data_store if item["node_id"] == node_id), None
-  )
-
-  if not node_data:
-    return jsonify({"error": f"Node '{node_id}' not found or inactive"}), 404
-
-  return jsonify(node_data), 200
-
-
-if __name__ == "__main__":
-  app.run(debug=True, port=5000)
+if __name__ == '__main__':
+    app.run(debug=True)
