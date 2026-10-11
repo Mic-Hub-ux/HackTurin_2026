@@ -566,13 +566,15 @@ function renderMap() {
       <text class="nlbl" x="${a[0]}" y="${a[1] + R + 16}" text-anchor="middle">${esc(nome)}${main ? " ★" : ""}</text></g>`;
   }
   const now = serverNow();
-  const recent = S.fwds.filter((f) => now - f.ts < 10000 && P[f.from_node] && P[f.to_node]);
+  // un tratto per volta: dall'incrocio precedente del percorso (hop_from) al destinatario
+  const hop = (f) => f.hop_from || f.from_node;
+  const recent = S.fwds.filter((f) => now - f.ts < 10000 && P[hop(f)] && P[f.to_node]);
   const seen = {};
   for (const f of recent) {
-    const k = f.from_node + ">" + f.to_node;
+    const k = hop(f) + ">" + f.to_node;
     if (seen[k]) continue;
     seen[k] = 1;
-    const a = P[f.from_node], b = P[f.to_node];
+    const a = P[hop(f)], b = P[f.to_node];
     const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
     const ux = dx / l, uy = dy / l;
     const s = [a[0] + ux * (R + 6), a[1] + uy * (R + 6)], e = [b[0] - ux * (R + 10), b[1] - uy * (R + 10)];

@@ -439,8 +439,10 @@
             lucide.createIcons();
         }
 
-        function animateForward(f) {
-            const a = S.traffic.find(n => n.node_id === f.from_node), b = S.traffic.find(n => n.node_id === f.to_node);
+        // un tratto di strada per volta: dall'incrocio precedente del percorso (hop_from) al destinatario
+        function animateForward(f, delay = 0) {
+            if (delay) { setTimeout(() => animateForward(f), delay); return; }
+            const a = S.traffic.find(n => n.node_id === (f.hop_from || f.from_node)), b = S.traffic.find(n => n.node_id === f.to_node);
             if (!a || !b || !a.coordinates || !b.coordinates) return;
             const line = L.polyline([[a.coordinates.lat, a.coordinates.lon], [b.coordinates.lat, b.coordinates.lon]],
                 { color: f.action === 'cancel' ? '#64748b' : cat(f.category).hex, weight: 5, dashArray: '12 12', className: 'forward-line' }).addTo(forwardLayer);
@@ -666,7 +668,14 @@
                     }
                 });
                 const fw = await api(`/api/forwards?after=${S.fwdAfter}&limit=50`);
-                if (!S.firstLoad) (fw.forwards || []).forEach(animateForward);
+                if (!S.firstLoad) {  // i tratti dello stesso pericolo si accendono uno dopo l'altro
+                    const passo = {};
+                    (fw.forwards || []).forEach(f => {
+                        const k = f.from_node + '|' + f.kind + '|' + f.action;
+                        passo[k] = (passo[k] || 0) + 1;
+                        animateForward(f, (passo[k] - 1) * 450);
+                    });
+                }
                 S.forwards = S.forwards.concat(fw.forwards || []).slice(-60);
                 S.fwdAfter = fw.last || S.fwdAfter;
                 const ev = await api(`/api/events?after=${S.evAfter}&limit=100&type=hazard,movement`);

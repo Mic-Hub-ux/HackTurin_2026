@@ -499,10 +499,16 @@ class Hub:
         kind = m.get("kind")
         if action == "cancel":
             # la fine del pericolo va a chi aveva ricevuto l'inizio
-            prev = [r[0] for r in self.db.execute(
-                "SELECT DISTINCT node FROM inbox WHERE hid=? AND from_node=? AND action='new'", (hid, src))]
+            prev = {}
+            for nodo, raw in self.db.execute("SELECT node, json FROM inbox WHERE hid=? AND from_node=? "
+                                             "AND action='new' ORDER BY seq", (hid, src)):
+                if nodo not in prev:
+                    try:
+                        prev[nodo] = json.loads(raw).get("hop_from")
+                    except ValueError:
+                        prev[nodo] = None
             if prev:
-                dests = [(d, "fine del pericolo", None) for d in prev]
+                dests = [(d, "fine del pericolo", da) for d, da in prev.items()]
             elif to_node:
                 dests = self._to_dest(src, to_node)
             elif m.get("propagate"):
@@ -532,7 +538,7 @@ class Hub:
                   "severity": m.get("severity", 2), "action": action, "from_node": src,
                   "ts": ts, "expires": exp, "targets": m.get("targets") or [],
                   "towards": actor.get("towards"), "arrives_from": arrives_from, "reason": reason,
-                  "original": m}
+                  "hop_from": da or src, "original": m}
             if simulated:
                 rh["simulated"] = True
             keep = max(exp, rx) + CANCEL_KEEP_MS if action == "cancel" else exp
@@ -722,6 +728,7 @@ class Hub:
                         "kind": r["kind"], "action": r["action"], "reason": r["reason"],
                         "simulated": bool(r["simulated"]), "severity": m.get("severity"),
                         "category": m.get("category"), "arrives_from": m.get("arrives_from"),
+                        "hop_from": m.get("hop_from") or r["from_node"],
                         "delivered": bool(r["acked"]) and r["seq"] <= r["acked"]})
         return {"forwards": out, "last": out[-1]["seq"] if out else after, "server_ts": now_ms()}
 
