@@ -6,9 +6,11 @@
     packed: 2 bit per LED -> LED1 bit 0-1, LED2 bit 2-3, LED3 bit 4-5, LED4 bit 6-7
             modo 0 spento, 1 acceso, 2 lampeggio lento (1 Hz), 3 lampeggio veloce (4 Hz)
     ttl_ms: validita' del comando. Il Python lo rimanda ogni ~1 s anche se non cambia.
-  Ruoli di default (config.json -> leds.roles), il Python li aggiorna appena cambia la scena:
-    LED1 (D2) GIALLO  persona davanti alla camera   LED2 (D3) BLU    emergenza (lampeggio veloce)
-    LED3 (D4) ROSSO   pericolo (lento se da un vicino)   LED4 (D5) VERDE  ciclista davanti alla camera
+  Ruoli (config.json -> leds.roles = ["hazard", "cyclist", "person", "emergency"], come sono cablati da noi);
+  il Python li aggiorna appena cambia la scena:
+    LED1 (D2) ROSSO   pericolo (lento se da un vicino)   LED2 (D3) VERDE  ciclista davanti alla camera
+    LED3 (D4) GIALLO  persona davanti alla camera        LED4 (D5) BLU    emergenza (lampeggio veloce)
+  Per spostare un colore su un altro pin basta cambiare l'ordine di leds.roles, non lo sketch.
 
   Fail-safe "cervello offline": se per ttl_ms non arriva nessun comando (app ferma, Python
   bloccato, Bridge giu') tutti i LED si spengono tranne il LED 4, che fa un breve lampo ogni 2 s.

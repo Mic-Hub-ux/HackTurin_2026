@@ -102,7 +102,7 @@ class Node:
             recenti = engine.tracker_recent(t)
             self._safe(self.stats.on_frame, t, cam, recenti, engine.space, engine.zones_of)
             # LED in tempo reale: chi c'e' adesso davanti alla camera, senza aspettare il tick
-            self._safe(self.leds.set_presence, {tr.label for tr in recenti}, t)
+            self._safe(self.leds.set_presence, {tr.label for tr in recenti}, t, [tr.id for tr in recenti])
             self._safe(self.leds.push, t)
             self._scene(t)
             return out

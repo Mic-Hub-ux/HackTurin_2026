@@ -5,9 +5,13 @@
                    <--GET /api/inbox/incrocio-1-- (pericoli dei vicini, ogni secondo)
 
 - Salva in SQLite tutto quello che arriva dai nodi (pericoli, tracce, statistiche, stato).
-- Inoltra i pericoli con "propagate" SOLO dove serve: next_nodes del messaggio, altrimenti
-  l'incrocio verso cui va il veicolo (actor.towards -> neighbors in topology.json), altrimenti
-  (forward_unknown_direction) tutti i vicini. Anche la fine del pericolo (cancel) viene inoltrata.
+- Inoltra i pericoli con "propagate" SOLO dove serve:
+    direzione nota (next_nodes del nodo, actor.towards in topology.json o un punto cardinale) ->
+      il primo incrocio in quella direzione e i successivi "dritti" lungo la strada: 2 incroci,
+      3 per mezzi di emergenza e veicoli veloci (si segue l'angolo tra le coordinate lat/lon);
+    direzione sconosciuta -> solo gli incroci vicini (forward_unknown_direction);
+    destinatario scelto (dashboard "Simula") -> tutti gli incroci del percorso piu' breve fino a lui.
+  Anche la fine del pericolo (cancel) va a tutti quelli che avevano ricevuto l'inizio.
 - Pagine: /           dashboard con la mappa di Torino (templates/index.html)
           /cyclist    assistente per il ciclista (templates/cyclist.html)
           /app        pagina per il telefono con vibrazione (src/node/python/web/app.html)
@@ -26,7 +30,10 @@ import argparse
 import copy
 import hmac
 import importlib.util
+import heapq
+import itertools
 import json
+import math
 import os
 import socket
 import sqlite3
@@ -53,6 +60,15 @@ INBOX_MAX = 100               # messaggi per lettura della casella
 CLOCK_TOLERANCE_MS = 60_000   # oltre: l'orologio del nodo e' sbagliato, uso l'ora di arrivo
 CANCEL_KEEP_MS = 60_000       # per quanto un "fine pericolo" resta utile a chi si ricollega
 ACTIVE_WINDOW_MS = 6 * 3600 * 1000
+_SIM_SEQ = itertools.count(1)   # id unici anche per due simulazioni nello stesso millisecondo
+HOPS_DIRECTION = 2            # incroci avvisati lungo la direzione del veicolo
+HOPS_FAST = 3                 # ... se e' un mezzo di emergenza o va veloce
+FAST_KMH, FAST_REL = 40, 3.0  # "veloce": km/h con calibrazione, altezze del box al secondo senza
+MAX_TURN_DEG = 70             # oltre questo angolo la strada "gira": la catena si ferma
+COMPASS = {"nord": 0, "north": 0, "n": 0, "nord-est": 45, "north-east": 45, "ne": 45, "est": 90, "east": 90,
+           "sud-est": 135, "south-east": 135, "se": 135, "sud": 180, "south": 180, "s": 180,
+           "sud-ovest": 225, "south-west": 225, "sw": 225, "so": 225, "ovest": 270, "west": 270, "w": 270,
+           "nord-ovest": 315, "north-west": 315, "nw": 315, "no": 315}
 
 KIND_LABELS = {
     "emergency_vehicle": "Mezzo di soccorso", "speeding": "Eccesso di velocita'",
@@ -188,6 +204,24 @@ class BadRequest(Exception):
 
 
 # ---------------------------------------------------------------------- topologia
+
+def _dist_m(a, b):
+    """Distanza approssimata in metri tra due (lat, lon) vicini."""
+    dy = (b[0] - a[0]) * 111320
+    dx = (b[1] - a[1]) * 111320 * math.cos(math.radians((a[0] + b[0]) / 2))
+    return math.hypot(dx, dy)
+
+
+def _bearing(a, b):
+    """Direzione da a verso b in gradi: 0 nord, 90 est, 180 sud, 270 ovest."""
+    dy = b[0] - a[0]
+    dx = (b[1] - a[1]) * math.cos(math.radians((a[0] + b[0]) / 2))
+    return math.degrees(math.atan2(dx, dy)) % 360
+
+
+def _turn(a, b):
+    return abs((a - b + 180) % 360 - 180)
+
 
 class Topology:
     """topology.json, ricaricato da solo quando il file cambia (si puo' modificare a server acceso)."""
@@ -333,28 +367,122 @@ class Hub:
 
     # ---------------------------------------------------------- inoltro
 
+    def _graph(self):
+        """Vicini in entrambi i sensi (basta scriverli su uno dei due incroci) e coordinate (lat, lon)."""
+        nodes = self.topology.get()["nodes"]
+        adj = {nid: set() for nid in nodes}
+        for nid, n in nodes.items():
+            for d in (n.get("neighbors") or {}).values():
+                if d and d != nid:
+                    adj.setdefault(nid, set()).add(d)
+                    adj.setdefault(d, set()).add(nid)
+        pos = {}
+        for nid, n in nodes.items():
+            c = _coords(n)
+            if c:
+                pos[nid] = (c["lat"], c["lon"])
+        return adj, pos
+
+    def _hops(self, m):
+        """Quanti incroci avvisare lungo la direzione: di piu' per emergenze e veicoli veloci."""
+        a = m.get("actor") if isinstance(m.get("actor"), dict) else {}
+        veloce = ((_is_num(a.get("speed_kmh")) and a["speed_kmh"] >= FAST_KMH)
+                  or (_is_num(a.get("speed_rel")) and a["speed_rel"] >= FAST_REL))
+        emergenza = m.get("kind") == "emergency_vehicle" or m.get("category") == "emergency"
+        return HOPS_FAST if emergenza or veloce else HOPS_DIRECTION
+
+    def _along(self, src, first, hops):
+        """first e poi gli incroci successivi che proseguono "dritti" nella direzione src -> first."""
+        adj, pos = self._graph()
+        chain, prev, cur = [first], src, first
+        while len(chain) < hops and prev in pos and cur in pos:
+            rotta = _bearing(pos[prev], pos[cur])
+            cand = [(_turn(rotta, _bearing(pos[cur], pos[n])), n) for n in adj.get(cur, ())
+                    if n in pos and n != src and n not in chain]
+            cand = [c for c in cand if c[0] <= MAX_TURN_DEG]
+            if not cand:
+                break
+            prev, cur = cur, min(cand)[1]
+            chain.append(cur)
+        return chain
+
+    def _path(self, src, dst):
+        """Percorso piu' breve (in metri, con le coordinate) da src a dst, estremi compresi."""
+        adj, pos = self._graph()
+        if src not in adj or dst not in adj:
+            return []
+        best, prev, heap = {src: 0.0}, {}, [(0.0, src)]
+        while heap:
+            d, u = heapq.heappop(heap)
+            if u == dst:
+                break
+            if d > best.get(u, math.inf):
+                continue
+            for v in adj.get(u, ()):
+                w = _dist_m(pos[u], pos[v]) if u in pos and v in pos else 100.0
+                if d + w < best.get(v, math.inf):
+                    best[v], prev[v] = d + w, u
+                    heapq.heappush(heap, (d + w, v))
+        if dst not in prev:
+            return []
+        path = [dst]
+        while path[-1] != src:
+            path.append(prev[path[-1]])
+        return path[::-1]
+
     def _route(self, m, src):
-        """Destinatari [(nodo, motivo)]: next_nodes, poi actor.towards in topologia, poi tutti i vicini."""
+        """Destinatari [(nodo, motivo, incrocio da cui arriva)]: lungo la direzione se nota, altrimenti i vicini."""
         topo = self.topology.get()
-        nn = [n for n in (m.get("next_nodes") or []) if isinstance(n, str) and n and n != src]
-        if nn:
-            return [(n, "next_nodes del nodo") for n in dict.fromkeys(nn)]
         neighbors = (topo["nodes"].get(src) or {}).get("neighbors") or {}
         actor = m.get("actor") if isinstance(m.get("actor"), dict) else {}
         towards = actor.get("towards")
-        if towards and towards in neighbors:
-            if neighbors[towards] and neighbors[towards] != src:
-                return [(neighbors[towards], f"va verso '{towards}'")]
-            log(f"   nessun inoltro: da '{towards}' si esce dalla rete di incroci")
-            return []
+        primi = [n for n in dict.fromkeys(m.get("next_nodes") or []) if isinstance(n, str) and n and n != src]
+        come = "direzione del veicolo (next_nodes del nodo)"
+        if not primi and towards:
+            if towards in neighbors:
+                if not neighbors[towards] or neighbors[towards] == src:
+                    log(f"   nessun inoltro: da '{towards}' si esce dalla rete di incroci")
+                    return []
+                primi, come = [neighbors[towards]], f"va verso '{towards}'"
+            elif str(towards).lower() in COMPASS:
+                adj, pos = self._graph()
+                gradi = COMPASS[str(towards).lower()]
+                cand = [(_turn(gradi, _bearing(pos[src], pos[n])), n) for n in adj.get(src, ())
+                        if src in pos and n in pos]
+                cand = [c for c in cand if c[0] <= MAX_TURN_DEG]
+                if cand:
+                    primi, come = [min(cand)[1]], f"va verso {towards}"
+        if primi:
+            hops = self._hops(m)
+            out, visti = [], {src}
+            for primo in primi:
+                da = src
+                for i, d in enumerate(self._along(src, primo, hops)):
+                    if d not in visti:
+                        visti.add(d)
+                        out.append((d, come if i == 0 else f"{come}, {i + 1}o incrocio sulla stessa strada", da))
+                    da = d
+            return out
         if not topo.get("forward_unknown_direction", True):
             log("   nessun inoltro: direzione sconosciuta (forward_unknown_direction = false)")
             return []
-        tutti = [d for d in dict.fromkeys(neighbors.values()) if d and d != src]
+        adj, _ = self._graph()
+        tutti = sorted(d for d in adj.get(src, ()) if d != src)
         if not tutti:
             log(f"   nessun inoltro: {src} non ha vicini in topology.json")
-        motivo = f"via '{towards}' non in topologia: tutti i vicini" if towards else "direzione sconosciuta: tutti i vicini"
-        return [(d, motivo) for d in tutti]
+        motivo = f"via '{towards}' non in topologia: incroci vicini" if towards else "direzione sconosciuta: incroci vicini"
+        return [(d, motivo, src) for d in tutti]
+
+    def _to_dest(self, src, dst):
+        """Dashboard "Simula" verso dst: anche tutti gli incroci in mezzo, sul percorso piu' breve."""
+        path = self._path(src, dst)
+        if len(path) < 2:
+            return [(dst, "scelto dalla dashboard", src)]
+        out = []
+        for i in range(1, len(path)):
+            motivo = "scelto dalla dashboard" if path[i] == dst else f"sul percorso piu' breve verso {dst}"
+            out.append((path[i], motivo, path[i - 1]))
+        return out
 
     def _server_times(self, m, rx):
         """ts/expires del pericolo; se l'orologio del nodo e' sbagliato li riporto all'ora del server."""
@@ -373,15 +501,15 @@ class Hub:
             prev = [r[0] for r in self.db.execute(
                 "SELECT DISTINCT node FROM inbox WHERE hid=? AND from_node=? AND action='new'", (hid, src))]
             if prev:
-                dests = [(d, "fine del pericolo") for d in prev]
+                dests = [(d, "fine del pericolo", None) for d in prev]
             elif to_node:
-                dests = [(to_node, "scelto dalla dashboard")]
+                dests = self._to_dest(src, to_node)
             elif m.get("propagate"):
                 dests = self._route(m, src)
             else:
                 return []
         elif to_node:
-            dests = [(to_node, "scelto dalla dashboard")]
+            dests = self._to_dest(src, to_node)
         elif m.get("propagate"):
             dests = self._route(m, src)
         else:
@@ -394,10 +522,10 @@ class Hub:
         topo_nodes = self.topology.get()["nodes"]
         actor = m.get("actor") if isinstance(m.get("actor"), dict) else {}
         out = []
-        for dest, reason in dests:
-            # da quale via del destinatario arrivera' il veicolo (la via che porta a src)
+        for dest, reason, da in dests:
+            # da quale via del destinatario arrivera' il veicolo (la via che porta all'incrocio precedente)
             nb = (topo_nodes.get(dest) or {}).get("neighbors") or {}
-            arrives_from = next((via for via, n in nb.items() if n == src), None)
+            arrives_from = next((via for via, n in nb.items() if n == (da or src)), None)
             rh = {"v": 1, "type": "remote_hazard", "node": dest, "id": hid, "kind": kind,
                   "category": m.get("category") or self.kinds.get(kind, {}).get("category", "risk"),
                   "severity": m.get("severity", 2), "action": action, "from_node": src,
@@ -703,7 +831,7 @@ class Hub:
         actor = {"track": 0, "class": actor_class(kind), "confidence": 1.0}
         if towards:
             actor["towards"] = towards
-        m = {"v": 1, "type": "hazard", "action": "new", "id": f"{src}-sim-{t}", "kind": kind,
+        m = {"v": 1, "type": "hazard", "action": "new", "id": f"{src}-sim-{t}-{next(_SIM_SEQ)}", "kind": kind,
              "category": info["category"], "node": src, "camera": "sim", "ts": t,
              "expires": t + int(info["validity_s"] * 1000), "cause": info["cause"], "cause_txt": info["cause_txt"],
              "severity": sev, "targets": info["targets"], "propagate": True, "norma": info["norma"],

@@ -531,6 +531,56 @@ def test_led_tempo_reale():
 
 
 @test
+def test_led_pericolo_si_spegne():
+    """Pericolo visto qui: spento appena l'oggetto sparisce. Pericolo di un vicino: resta acceso."""
+    from leds import LedController
+    bridge = FakeBridge()
+    leds = LedController({"roles": ["person", "emergency", "hazard", "cyclist"]}, bridge=bridge, start_thread=False)
+    t = time.time()
+    now = int(t * 1000)
+    leds.on_hazard({"id": "h1", "kind": "bike_lane_invasion", "severity": 3, "ts": now, "expires": now + 30000,
+                    "actor": {"track": "cam0-9", "class": "vehicle"}}, True, t)
+    leds.set_presence({"vehicle"}, t, ["cam0-9"])
+    leds.push(t)
+    check("LED rosso acceso mentre l'auto e' nella ciclabile", modes(bridge.calls[-1][1][0])[2] > 0)
+    leds.set_presence({"vehicle"}, t + 0.3, ["cam0-9"])
+    leds.push(t + 0.3)
+    check("LED rosso ancora acceso finche' l'auto si vede", modes(bridge.calls[-1][1][0])[2] > 0)
+    leds.push(t + 1.2)
+    check("LED rosso spento appena l'auto sparisce (non dopo 10 s)", modes(bridge.calls[-1][1][0])[2] == 0)
+    leds.on_hazard({"id": "r1", "kind": "bike_lane_invasion", "severity": 2, "ts": now, "expires": now + 30000,
+                    "from_node": "incrocio-2"}, False, t + 1.2)
+    leds.push(t + 5)
+    check("pericolo di un vicino: LED rosso resta acceso anche senza oggetti in vista",
+          modes(bridge.calls[-1][1][0])[2] > 0)
+    leds.close()
+
+
+@test
+def test_inoltro_percorsi():
+    """Inoltro sulla topologia vera: lungo la direzione (2 o 3 incroci), ai vicini, sul percorso piu' breve."""
+    import server as srv
+    with tempfile.TemporaryDirectory() as tmp:
+        hub = srv.Hub(Path(tmp) / "server.db", srv.Topology(QUI.parents[1] / "server" / "topology.json"))
+        try:
+            def a_chi(**body):
+                return [d["node"] for d in hub.simulate(body)["delivered_to"]]
+            check("percorso piu' breve 4 -> 1: anche gli incroci in mezzo",
+                  a_chi(from_node="incrocio-4", to_node="incrocio-1") == ["incrocio-3", "incrocio-2", "incrocio-1"])
+            check("direzione nota: 2 incroci lungo la strada",
+                  a_chi(from_node="incrocio-1", towards="sud-ovest") == ["incrocio-2", "incrocio-3"])
+            check("ambulanza con direzione nota: 3 incroci lungo la strada",
+                  a_chi(from_node="incrocio-1", towards="sud-ovest", kind="emergency_vehicle")
+                  == ["incrocio-2", "incrocio-3", "incrocio-4"])
+            check("direzione come punto cardinale (nord)",
+                  a_chi(from_node="incrocio-3", towards="nord")[:1] == ["incrocio-2"])
+            check("direzione sconosciuta: solo gli incroci vicini",
+                  sorted(a_chi(from_node="incrocio-6")) == ["incrocio-1", "incrocio-5", "incrocio-7"])
+        finally:
+            hub.close()
+
+
+@test
 def test_token_e_env():
     """Token dei dispositivi (SC_TOKEN): scritture protette, letture della dashboard pubbliche; .env -> nodo."""
     import server as srv
@@ -673,7 +723,8 @@ def main():
     for fn in (test_scenari_base, test_u_turn, test_collisione_e_mancato_investimento, test_sorpasso_ciclista,
                test_coda, test_pedoni, test_movimento_vietato, test_semaforo, test_cicli_di_vita,
                test_regole_senza_calibrazione, test_riepiloghi, test_robustezza, test_configurazione,
-               test_nodo_e_server, test_led_tempo_reale, test_token_e_env, test_peer_to_peer, test_api_e_pagina_telefono,
+               test_nodo_e_server, test_led_tempo_reale, test_led_pericolo_si_spegne,
+               test_inoltro_percorsi, test_token_e_env, test_peer_to_peer, test_api_e_pagina_telefono,
                test_fusione_due_camere):
         print(f"\n== {fn.__name__}")
         fn()

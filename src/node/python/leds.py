@@ -8,7 +8,10 @@ Ogni LED ha un ruolo (config leds.roles) e un modo: 0 spento, 1 acceso, 2 lampeg
     cyclist   (verde)  acceso finche' la camera vede un ciclista
 Altri ruoli: local, remote, status, any, vehicle, none.
 Tempo reale: il nodo chiama push() appena cambia qualcosa (presenze a ogni frame, pericoli
-all'arrivo); il keep-alive verso l'MCU resta in tick(). I 4 modi viaggiano in un solo intero (2 bit per LED, LED 1 = bit 0-1):
+all'arrivo); il keep-alive verso l'MCU resta in tick().
+Un pericolo visto QUI resta acceso solo finche' la camera vede ancora l'oggetto che lo causa
+(la sua traccia), al massimo hold_s; un pericolo arrivato da un VICINO resta acceso fino al suo
+cancel o alla sua scadenza. I 4 modi viaggiano in un solo intero (2 bit per LED, LED 1 = bit 0-1):
     bridge.call("set_leds", packed, ttl_ms)        -> node/sketch/sketch.ino, set_leds(int, int)
 Se l'MCU non riceve comandi per ttl_ms spegne tutto da solo (fail-safe "cervello offline"):
 per questo il valore viene rimandato ogni refresh_s anche quando non cambia.
@@ -58,6 +61,7 @@ class LedController:
         self._local = {}    # id -> {"sev", "emergency", "until"}
         self._remote = {}
         self._seen = {}     # classe vista dalla camera -> ultimo istante
+        self._tracks = {}   # traccia vista dalla camera -> ultimo istante
         self._online = False
         self._modes = [0, 0, 0, 0]
         self._packed = None             # ultimo valore calcolato
@@ -126,17 +130,26 @@ class LedController:
                     self._warn("scaduto", f"[led] pericolo remoto {hid} gia' scaduto all'arrivo "
                                           f"(messaggio vecchio o orologio della board non sincronizzato?)")
                 return
-            attivi[hid] = {"sev": sev, "emergency": emergency, "until": until}
+            actor = msg.get("actor") if isinstance(msg.get("actor"), dict) else {}
+            track = actor.get("track") if local and actor.get("track") not in (None, 0, "") else None
+            attivi[hid] = {"sev": sev, "emergency": emergency, "until": until, "track": track}
+            if track is not None:
+                self._tracks.setdefault(str(track), t)
             if len(attivi) > MAX_ATTIVI:
                 del attivi[min(attivi, key=lambda k: attivi[k]["until"])]
 
-    def set_presence(self, classes, t):
-        """Classi viste adesso dalla camera (person, cyclist, vehicle, emergency)."""
+    def set_presence(self, classes, t, tracks=()):
+        """Classi e tracce viste adesso dalla camera (person, cyclist, vehicle, emergency)."""
         if not self.enabled:
             return
         with self._lock:
             for c in classes:
                 self._seen[str(c)] = float(t)
+            for tr in tracks:
+                self._tracks[str(tr)] = float(t)
+            if len(self._tracks) > 4 * MAX_ATTIVI:  # tracce vecchie: non servono piu'
+                for k in [k for k, v in self._tracks.items() if t - v > 60]:
+                    del self._tracks[k]
 
     def push(self, t=None):
         """Aggiorna subito i LED se qualcosa e' cambiato (senza aspettare il tick)."""
@@ -173,6 +186,10 @@ class LedController:
         for attivi in (self._local, self._remote):
             for k in [k for k, h in attivi.items() if h["until"] <= t]:
                 del attivi[k]
+        # pericolo locale legato a un oggetto: si spegne appena la camera non lo vede piu'
+        for k in [k for k, h in self._local.items() if h.get("track") is not None
+                  and t - self._tracks.get(str(h["track"]), -1e9) > PRESENZA_HOLD_S]:
+            del self._local[k]
         local_sev = max((h["sev"] for h in self._local.values() if h["sev"] >= self.min_severity), default=0)
         local = LOCAL_MODE.get(local_sev, 0)
         remote_sev = max((h["sev"] for h in self._remote.values()), default=0)
