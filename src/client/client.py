@@ -3,6 +3,7 @@ import random
 import requests
 import multiprocessing as mp
 import time
+import json
 from pathlib import Path
 from queue import Empty
 
@@ -33,32 +34,39 @@ URL = os.environ.get("SC_TRAFFIC_URL") or "https://michubux.pythonanywhere.com/a
 # Segreto condiviso con il server (SC_TOKEN nel file .env, vedi .env.example)
 API_SECRET_TOKEN = os.environ.get("SC_TOKEN", "")
 
-NUM_NODES = 12
 DURATION = 60
 INTERVAL = 1
 TIMEOUT = 15
 
-LUOGHI_TORINO = [
-    {"name": "node_01", "latitude": 45.0625, "longitude": 7.6720},
-    {"name": "node_02", "latitude": 45.0625, "longitude": 7.6735},
-    {"name": "node_03", "latitude": 45.0625, "longitude": 7.6750},
-    {"name": "node_04", "latitude": 45.0613, "longitude": 7.6720},
-    {"name": "node_05", "latitude": 45.0613, "longitude": 7.6735},
-    {"name": "node_06", "latitude": 45.0613, "longitude": 7.6750},
-    {"name": "node_07", "latitude": 45.0601, "longitude": 7.6720},
-    {"name": "node_08", "latitude": 45.0601, "longitude": 7.6735},
-    {"name": "node_09", "latitude": 45.0601, "longitude": 7.6750},
-    {"name": "node_10", "latitude": 45.0589, "longitude": 7.6720},
-    {"name": "node_11", "latitude": 45.0589, "longitude": 7.6735},
-    {"name": "node_12", "latitude": 45.0589, "longitude": 7.6750},
-]
+# 1. Localizza e carica dinamicamente il file topology.json
+# Presuppone che la struttura sia: src/client/client.py e src/server/topology.json
+TOPOLOGY_PATH = Path(__file__).resolve().parents[1] / "server" / "topology.json"
 
-def client_worker(node_number, start_event, stop_event, result_queue):
-    node_id = f"node_{node_number:02d}"
-    luogo = LUOGHI_TORINO[node_number - 1]
+try:
+    with open(TOPOLOGY_PATH, 'r', encoding='utf-8') as f:
+        topology_data = json.load(f)
+except FileNotFoundError:
+    print(f"Errore: File '{TOPOLOGY_PATH}' non trovato.")
+    print("Assicurati di lanciare lo script mantenendo intatta la struttura delle directory.")
+    exit(1)
 
-    latitude = luogo["latitude"]
-    longitude = luogo["longitude"]
+# 2. Crea la lista dei nodi usando la struttura del file JSON (chiavi "incrocio-1", ecc.)
+LUOGHI_TORINO = []
+for node_id, data in topology_data.get("nodes", {}).items():
+    LUOGHI_TORINO.append({
+        "node_id": node_id,
+        "latitude": data.get("lat", 0.0),
+        "longitude": data.get("lon", 0.0)
+    })
+
+NUM_NODES = len(LUOGHI_TORINO)
+
+
+def client_worker(nodo_info, start_event, stop_event, result_queue):
+    # Estrae i dati letti dal file JSON
+    node_id = nodo_info["node_id"]
+    latitude = nodo_info["latitude"]
+    longitude = nodo_info["longitude"]
 
     # Header protetti con token segreto
     headers = {
@@ -123,10 +131,11 @@ def main():
     result_queue = ctx.Queue()
 
     processi = []
-    for numero in range(1, NUM_NODES + 1):
+    # Passiamo direttamente il dizionario con le info del nodo al worker
+    for nodo_info in LUOGHI_TORINO:
         p = ctx.Process(
             target=client_worker,
-            args=(numero, start_event, stop_event, result_queue)
+            args=(nodo_info, start_event, stop_event, result_queue)
         )
         p.start()
         processi.append(p)

@@ -1,26 +1,78 @@
 {
-  "_note": "neighbors: {nome della via (come negli approaches del config del nodo): incrocio a cui porta}. null = la via esce dalla rete (nessun inoltro). virtual = incrocio senza board, si simula dalla dashboard. lat/lon = posizione sulla mappa di Torino; pos = posizione nella console (0..1). Il file si puo' modificare a server acceso: viene ricaricato da solo.",
+  "_note": "Rete 12 nodi Torino - Le connessioni 'neighbors' creano le linee tratteggiate sulla mappa",
   "forward_unknown_direction": true,
   "nodes": {
     "incrocio-1": {
-      "name": "Incrocio 1 - Via Vincenzo Vela (board)",
-      "lat": 45.06438, "lon": 7.66834,
-      "pos": [0.5, 0.5],
-      "neighbors": {"via": "incrocio-2", "incrocio": "incrocio-3"}
+      "name": "Piazza Castello",
+      "lat": 45.071375, "lon": 7.686231,
+      "pos": [0.5, 0.2],
+      "neighbors": {"sud": "incrocio-2", "ovest": "incrocio-10"}
     },
     "incrocio-2": {
-      "name": "Incrocio 2",
-      "virtual": true,
-      "lat": 45.06440, "lon": 7.66640,
-      "pos": [0.14, 0.5],
-      "neighbors": {"est": "incrocio-1", "ovest": null}
+      "name": "Via Po / San Massimo",
+      "lat": 45.068350, "lon": 7.691262,
+      "pos": [0.6, 0.3],
+      "neighbors": {"nord": "incrocio-1", "est": "incrocio-3"}
     },
     "incrocio-3": {
-      "name": "Incrocio 3",
-      "virtual": true,
-      "lat": 45.06436, "lon": 7.67030,
-      "pos": [0.86, 0.5],
-      "neighbors": {"ovest": "incrocio-1", "est": null}
+      "name": "Piazza Vittorio Veneto",
+      "lat": 45.065275, "lon": 7.694589,
+      "pos": [0.8, 0.4],
+      "neighbors": {"ovest": "incrocio-2"}
+    },
+    "incrocio-4": {
+      "name": "Via Roma / Maria Vittoria",
+      "lat": 45.067373, "lon": 7.682622,
+      "pos": [0.4, 0.4],
+      "neighbors": {"sud": "incrocio-5"}
+    },
+    "incrocio-5": {
+      "name": "Piazza San Carlo",
+      "lat": 45.066228, "lon": 7.682126,
+      "pos": [0.4, 0.5],
+      "neighbors": {"nord": "incrocio-4", "sud": "incrocio-6"}
+    },
+    "incrocio-6": {
+      "name": "Corso Vittorio / Via Roma",
+      "lat": 45.061706, "lon": 7.679860,
+      "pos": [0.4, 0.7],
+      "neighbors": {"nord": "incrocio-5", "sud": "incrocio-11", "ovest": "incrocio-12"}
+    },
+    "incrocio-7": {
+      "name": "PoliTO (Corso Einaudi)",
+      "lat": 45.061139, "lon": 7.661858,
+      "pos": [0.1, 0.5],
+      "neighbors": {"nord": "incrocio-8"}
+    },
+    "incrocio-8": {
+      "name": "Crocetta (Corso Stati Uniti)",
+      "lat": 45.063345, "lon": 7.663363,
+      "pos": [0.1, 0.7],
+      "neighbors": {"sud": "incrocio-7", "est": "incrocio-12"}
+    },
+    "incrocio-9": {
+      "name": "Piazza Statuto",
+      "lat": 45.076800, "lon": 7.669865,
+      "pos": [0.1, 0.1],
+      "neighbors": {"est": "incrocio-10"}
+    },
+    "incrocio-10": {
+      "name": "Porta Palazzo",
+      "lat": 45.077673, "lon": 7.682855,
+      "pos": [0.4, 0.1],
+      "neighbors": {"ovest": "incrocio-9", "sud": "incrocio-1"}
+    },
+    "incrocio-11": {
+      "name": "Porta Nuova",
+      "lat": 45.059439, "lon": 7.680045,
+      "pos": [0.4, 0.9],
+      "neighbors": {"nord": "incrocio-6"}
+    },
+    "incrocio-12": {
+      "name": "Corso Matteotti",
+      "lat": 45.063131, "lon": 7.674395,
+      "pos": [0.2, 0.6],
+      "neighbors": {"est": "incrocio-6", "ovest": "incrocio-8"}
     }
   }
 }
