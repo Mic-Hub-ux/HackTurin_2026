@@ -64,7 +64,7 @@ _SIM_SEQ = itertools.count(1)   # id unici anche per due simulazioni nello stess
 HOPS_DIRECTION = 2            # incroci avvisati lungo la direzione del veicolo
 HOPS_FAST = 3                 # ... se e' un mezzo di emergenza o va veloce
 FAST_KMH, FAST_REL = 40, 3.0  # "veloce": km/h con calibrazione, altezze del box al secondo senza
-MAX_TURN_DEG = 70             # oltre questo angolo la strada "gira": la catena si ferma
+MAX_TURN_DEG = 100            # curve fino a 100 gradi: la catena segue la strada, ma non torna indietro
 COMPASS = {"nord": 0, "north": 0, "n": 0, "nord-est": 45, "north-east": 45, "ne": 45, "est": 90, "east": 90,
            "sud-est": 135, "south-east": 135, "se": 135, "sud": 180, "south": 180, "s": 180,
            "sud-ovest": 225, "south-west": 225, "sw": 225, "so": 225, "ovest": 270, "west": 270, "w": 270,

@@ -30,7 +30,7 @@
   },
   "crosswalk_direction_names": ["sinistra->destra", "destra->sinistra"],
 
-  "neighbors": {"via": "incrocio-2", "incrocio": "incrocio-6"},
+  "neighbors": {"via": "incrocio-2", "incrocio": "incrocio-8"},
   "traffic_light": {"mode": "none"},
   "thresholds": {"speed_limit_kmh": 50},
 
