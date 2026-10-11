@@ -76,6 +76,9 @@ Aprite `C:\Users\Gabriele\Desktop\Hackaton\HackTurin_2026\src\node\python\config
 ```
 (gli indirizzi di ESP32 e R4 in `peers` li aggiungete nelle Parti 5 e 6).
 
+Lasciate `"token": ""`. Il token è nel file `.env` nella radice della repo, che non va su GitHub
+(il modello è `.env.example`). Il server lo legge da solo, mentre sulla board lo copiate al passo 2.4.
+
 ### 2.4 Copiare il software sulla board
 Dal PC (PowerShell):
 ```bash
@@ -98,6 +101,12 @@ cp -r ~/sc_python/* ~/ArduinoApps/efesto/python/
 cp ~/sc_sketch.ino ~/ArduinoApps/efesto/sketch/sketch.ino
 ```
 I backup vanno nella home e **non** nella cartella `sketch/`: due file `.ino` nella stessa cartella non compilano.
+
+Il token: copiate il `.env` accanto a `config.json`. Il comando parte dal PC, in PowerShell, e il `cp -r ... *`
+di prima non copia i file che iniziano con il punto:
+```bash
+scp C:\Users\Gabriele\Desktop\Hackaton\HackTurin_2026\.env efesto:~/ArduinoApps/efesto/python/.env
+```
 
 > D'ora in poi, quando cambiate solo la configurazione, basta:
 > ```bash
@@ -182,19 +191,31 @@ Le auto si provano con un **video di traffico su tablet/telefono davanti alla ca
    ```bash
    winget install --id Cloudflare.cloudflared
    ```
-2. Riavviate il server con un **token**, perché il link è pubblico:
-   ```bash
-   C:\Users\Gabriele\Desktop\Hackaton\dataset\.venv\Scripts\python.exe server.py --port 8000 --token "una-parola-segreta"
-   ```
-   Il token va messo anche nel config della board: `"server": {"url": ..., "token": "una-parola-segreta"}`.
+2. Controllate che il server parta con il token: all'avvio deve stampare `.env: ...` e `token: richiesto ai dispositivi`.
+   Con il link pubblico chiunque **vede** la dashboard, ma senza `SC_TOKEN` nessuno può mandare dati o simulare.
 3. Aprite il tunnel:
    ```bash
    cloudflared tunnel --url http://localhost:8000
    ```
-4. Mandate al collega il link `https://....trycloudflare.com` che compare. La dashboard gli chiederà il token.
+4. Mandate al collega il link `https://....trycloudflare.com` che compare. La dashboard gli chiede il token solo se usa **Simulate**.
 5. Chiudete il tunnel (Ctrl+C) quando avete finito.
 
 In entrambi i casi la board continua a parlare con il PC sulla rete locale: condividete solo la dashboard.
+
+**C. Server sempre online su PythonAnywhere.** Lì basta scaricare 11 file della repo: `src/server/`, `events.py` e `app.html`.
+Da una console Bash di PythonAnywhere:
+```bash
+cd ~/HackTurin_2026
+```
+```bash
+git sparse-checkout set --no-cone /src/server/ /src/node/python/events.py /src/node/python/web/app.html
+```
+```bash
+git pull
+```
+Poi create il file `~/HackTurin_2026/.env` con la riga `SC_TOKEN=...`, la stessa del `.env` del PC, e premete
+**Reload** nella scheda **Web**. Il file WSGI può restare `from server import app as application`.
+Sulla board: `"server": {"url": "https://<utente>.pythonanywhere.com"}`.
 
 ---
 
@@ -262,7 +283,7 @@ Dimostra il **peer‑to‑peer tra due incroci senza server**.
 |---|---|
 | Il telefono non apre `http://IP-PC:8000` | rete Windows impostata su "Pubblica" (Parte 1.3), firewall, oppure client isolation della rete |
 | In console `[server] ... non raggiungibile` | `server.url` sbagliato (deve essere `http://IP-PC:8000`, senza `/api`), oppure server spento |
-| `[server] ... token rifiutato` | il token nel config della board deve coincidere con `--token` del server |
+| `[server] ... token rifiutato` | il `.env` sulla board (accanto a `config.json`) deve avere lo stesso `SC_TOKEN` del server |
 | La compilazione fallisce su `Arduino_RouterBridge.h` | aggiungete la libreria Arduino_RouterBridge allo sketch (Parte 2.6) |
 | Il LED 4 lampeggia ogni 2 s e gli altri sono spenti | il Python non comanda l'MCU: app ferma o in errore, guardate la console |
 | I LED non si accendono mai | gamba lunga e gamba corta invertite, oppure LED ancora collegato al 5 V |

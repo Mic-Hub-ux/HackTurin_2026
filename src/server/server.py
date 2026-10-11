@@ -15,6 +15,9 @@
   "Simula pericolo": con un solo dispositivo si finge che un incrocio vicino abbia visto qualcosa
   e si guarda la board accendere i LED.
 - /api/traffic resta compatibile con il client.py di simulazione dei 12 nodi.
+- Token (SC_TOKEN nel file .env, vedi .env.example): serve per tutto cio' che SCRIVE (POST dei nodi,
+  /api/traffic, /api/simulate) e per la casella dei pericoli dei nodi. Pagine e letture della
+  dashboard restano pubbliche, in sola lettura.
 
 Solo libreria standard:   python server.py --port 8000 --topology topology.json --db server.db
 Su un hosting Flask (es. PythonAnywhere) lo stesso server gira tramite flask_app.py.
@@ -24,6 +27,7 @@ import copy
 import hmac
 import importlib.util
 import json
+import os
 import socket
 import sqlite3
 import sys
@@ -102,6 +106,30 @@ def now_ms():
 
 def log(testo):
     print(time.strftime("%H:%M:%S"), testo, flush=True)
+
+
+def load_env(start=HERE, levels=3):
+    """Legge il primo .env trovato in start o nelle cartelle sopra (righe CHIAVE=valore, # commenti).
+    Non sovrascrive le variabili d'ambiente gia' impostate. Ritorna il percorso letto o None."""
+    start = Path(start)
+    for d in [start, *list(start.parents)[:levels]]:
+        p = d / ".env"
+        if not p.is_file():
+            continue
+        for riga in p.read_text(encoding="utf-8-sig").splitlines():
+            riga = riga.strip()
+            if not riga or riga.startswith("#") or "=" not in riga:
+                continue
+            k, v = riga.split("=", 1)
+            k, v = k.strip(), v.strip()
+            if k.startswith("export "):
+                k = k[7:].strip()
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                v = v[1:-1]
+            if k:
+                os.environ.setdefault(k, v)
+        return p
+    return None
 
 
 def _is_num(v):
@@ -209,7 +237,7 @@ class Topology:
 # ---------------------------------------------------------------------- logica
 
 class Hub:
-    def __init__(self, db_path, topology, offline_after_s=15.0):
+    def __init__(self, db_path, topology, offline_after_s=15.0, wal=True):
         self.topology = topology
         self.offline_ms = int(offline_after_s * 1000)
         self.kinds = load_kinds()
@@ -220,7 +248,8 @@ class Hub:
         self.db = sqlite3.connect(str(db_path), check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         with self.lock:
-            self.db.execute("PRAGMA journal_mode=WAL")
+            # WAL e' piu' veloce sul PC; sui dischi di rete degli hosting (PythonAnywhere) si usa il modo classico
+            self.db.execute(f"PRAGMA journal_mode={'WAL' if wal else 'DELETE'}")
             self.db.executescript(SCHEMA)
             self.db.commit()
 
@@ -633,7 +662,8 @@ class Hub:
             rec["_rx"] = now_ms()
             self.legacy[str(node_id)] = rec
             n = len(self.legacy)
-        return {"status": "success", "message": "Data recorded successfully", "total_active_nodes": n}
+        return {"status": "success", "message": "Data recorded successfully", "node_id": str(node_id),
+                "total_active_nodes": n}
 
     # ---------------------------------------------------------- simulazione
 
@@ -823,7 +853,10 @@ def dispatch(hub, token, method, raw_path, auth_header, read_body, ip=None):
                 return json_reply(200, found)
         if not path.startswith("/api/"):
             return json_reply(404, {"error": f"non trovato: {path}"})
-        if not _authorized(token, auth_header):
+        # il token protegge cio' che scrivono (POST) o leggono solo i dispositivi (casella dei pericoli);
+        # le letture della dashboard qui sotto restano pubbliche, in sola lettura
+        dispositivo = method not in ("GET", "HEAD") or path.startswith("/api/inbox/")
+        if dispositivo and not _authorized(token, auth_header):
             return json_reply(401, {"error": "token mancante o sbagliato (Authorization: Bearer <token>)"})
         if method == "POST":
             if path == "/api/events":
@@ -963,13 +996,16 @@ def _resolve(given, default_name):
 def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")  # la console di Windows non ha tutti i caratteri
+    env_file = load_env()
     ap = argparse.ArgumentParser(description="Smart Crossing - server centrale: riceve i dati degli incroci, "
                                              "inoltra i pericoli ai vicini, dashboard web.")
     ap.add_argument("--port", type=int, default=8000, help="porta HTTP (default 8000)")
     ap.add_argument("--host", default="0.0.0.0", help="indirizzo di ascolto (default 0.0.0.0 = tutta la rete)")
     ap.add_argument("--topology", default=None, help="topologia degli incroci (default: topology.json accanto a server.py)")
     ap.add_argument("--db", default=None, help="database SQLite (default: server.db accanto a server.py)")
-    ap.add_argument("--token", default="", help="se impostato, richiesto come 'Authorization: Bearer <token>'")
+    ap.add_argument("--token", default=os.environ.get("SC_TOKEN", ""),
+                    help="richiesto come 'Authorization: Bearer <token>' a nodi e client (default: SC_TOKEN del .env); "
+                         "--token \"\" lo disattiva")
     ap.add_argument("--offline-after", type=float, default=15.0,
                     help="secondi senza notizie dopo cui un incrocio e' offline (default 15)")
     args = ap.parse_args(argv)
@@ -991,7 +1027,8 @@ def main(argv=None):
     print("Smart Crossing - server centrale")
     print(f"  database:   {db_path}")
     print(f"  topologia:  {topo_path}")
-    print(f"  token:      {'richiesto (Authorization: Bearer ...)' if args.token else 'nessuno'}")
+    print(f"  .env:       {env_file or 'nessuno (copiate .env.example in .env)'}")
+    print(f"  token:      {'richiesto ai dispositivi (Authorization: Bearer ...)' if args.token else 'nessuno'}")
     print()
     print(f"  Dashboard su questo PC:    http://localhost:{port}/")
     for ip in ips:
@@ -999,11 +1036,12 @@ def main(argv=None):
     base = f"http://{ips[0]}:{port}" if ips else f"http://localhost:{port}"
     print(f"  Ciclista: {base}/cyclist   Telefono: {base}/app?node=incrocio-1   Console offline: {base}/console")
     if ips:
-        tok = f', "token": "{args.token}"' if args.token else ""
         print()
         print("  Nel config.json della board (se ci sono piu' indirizzi, quello della rete della board):")
         for ip in ips:
-            print(f'    "server": {{"url": "http://{ip}:{port}"{tok}}}')
+            print(f'    "server": {{"url": "http://{ip}:{port}"}}')
+        if args.token:
+            print("  e il token: copiate il .env accanto a config.json sulla board (oppure \"token\" in config.json).")
     else:
         print("  (nessun indirizzo di rete locale trovato: il PC e' collegato al Wi-Fi?)")
     print()
@@ -1018,6 +1056,15 @@ def main(argv=None):
         httpd.server_close()
         hub.close()
     return 0
+
+
+def __getattr__(name):
+    """'from server import app' (vecchio file WSGI di PythonAnywhere) -> l'app Flask di flask_app.py.
+    Flask si importa solo qui: server.py da solo resta con la sola libreria standard."""
+    if name in ("app", "application"):
+        from flask_app import app
+        return app
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 if __name__ == "__main__":

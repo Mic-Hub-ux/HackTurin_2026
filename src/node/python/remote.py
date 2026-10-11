@@ -43,7 +43,7 @@ def _base_url(url):
 def _descrivi(e):
     if isinstance(e, urllib.error.HTTPError):
         if e.code in (401, 403):
-            return f"HTTP {e.code}: token rifiutato, controlla server.token"
+            return f"HTTP {e.code}: token rifiutato, controlla SC_TOKEN nel .env (o server.token)"
         if e.code == 404:
             return "HTTP 404: server.url deve essere l'indirizzo base, es. http://192.168.1.10:8000"
         return f"HTTP {e.code}"

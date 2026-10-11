@@ -10,12 +10,14 @@ Uso:  python test_suite.py          (dalla cartella node/tools; esce con codice 
 import copy
 import json
 import math
+import os
 import socket
 import sys
 import tempfile
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -498,6 +500,63 @@ def test_nodo_e_server():
 
 
 @test
+def test_token_e_env():
+    """Token dei dispositivi (SC_TOKEN): scritture protette, letture della dashboard pubbliche; .env -> nodo."""
+    import server as srv
+    with tempfile.TemporaryDirectory() as tmp:
+        hub = srv.Hub(Path(tmp) / "server.db", srv.Topology(QUI.parents[1] / "server" / "topology.json"))
+        httpd = srv.make_server(hub, "127.0.0.1", 0, token="prova-token")
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+        def stato(path, data=None, token=None):
+            h = {"Content-Type": "application/json"}
+            if token:
+                h["Authorization"] = f"Bearer {token}"
+            req = urllib.request.Request(url + path, data=json.dumps(data).encode() if data is not None else None,
+                                         headers=h)
+            try:
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+
+        traffico = {"node_id": "node_01", "counts": {"pedestrians": 1, "cyclists": 0, "ambulances": 0}}
+        try:
+            check("token: POST /api/traffic senza token -> 401", stato("/api/traffic", traffico) == 401)
+            check("token: POST /api/traffic con token sbagliato -> 401", stato("/api/traffic", traffico, "no") == 401)
+            check("token: POST /api/traffic con il token giusto -> 201",
+                  stato("/api/traffic", traffico, "prova-token") == 201)
+            check("token: casella dei pericoli del nodo protetta",
+                  stato("/api/inbox/incrocio-1") == 401 and stato("/api/inbox/incrocio-1", token="prova-token") == 200)
+            check("token: Simula pericolo protetto",
+                  stato("/api/simulate", {"from_node": "incrocio-2", "to_node": "incrocio-1"}) == 401)
+            pubbliche = ("/", "/cyclist", "/api/traffic", "/api/summary", "/api/nodes", "/api/events", "/api/kinds")
+            check("token: pagine e letture della dashboard pubbliche",
+                  all(stato(p) == 200 for p in pubbliche), {p: stato(p) for p in pubbliche})
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            hub.close()
+
+        app = Path(tmp) / "app"
+        app.mkdir()
+        (app / ".env").write_text('# commento\nSC_TOKEN="dal-env"\nexport SC_P2P_KEY=chiave-env\n', encoding="utf-8")
+        (app / "config.json").write_text(json.dumps({"server": {"url": "http://x"}, "p2p": {"key": "dal-config"}}),
+                                         encoding="utf-8")
+        salvate = {k: os.environ.pop(k, None) for k in ("SC_TOKEN", "SC_P2P_KEY")}
+        try:
+            cfg, _ = load_config(app / "config.json")
+            check(".env: token del server letto dal .env", cfg["server"]["token"] == "dal-env", cfg["server"])
+            check(".env: un valore scritto in config.json vince sul .env", cfg["p2p"]["key"] == "dal-config")
+        finally:
+            for k, v in salvate.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
+
+
+@test
 def test_peer_to_peer():
     from node import Node
     with tempfile.TemporaryDirectory() as tmp:
@@ -583,7 +642,8 @@ def main():
     for fn in (test_scenari_base, test_u_turn, test_collisione_e_mancato_investimento, test_sorpasso_ciclista,
                test_coda, test_pedoni, test_movimento_vietato, test_semaforo, test_cicli_di_vita,
                test_regole_senza_calibrazione, test_riepiloghi, test_robustezza, test_configurazione,
-               test_nodo_e_server, test_peer_to_peer, test_api_e_pagina_telefono, test_fusione_due_camere):
+               test_nodo_e_server, test_token_e_env, test_peer_to_peer, test_api_e_pagina_telefono,
+               test_fusione_due_camere):
         print(f"\n== {fn.__name__}")
         fn()
     falliti = [r for r in RISULTATI if not r[1]]

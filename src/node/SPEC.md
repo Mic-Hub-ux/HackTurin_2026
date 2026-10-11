@@ -244,6 +244,8 @@ polling di `/api/events`, banner colorato e vibrazione (Android) per i pericoli 
 - `GET /` — dashboard HTML/JS senza librerie esterne (funziona offline): nodi online/offline, flusso
   eventi in tempo reale (polling 1 s), contatori per tipo, ultimo stato/statistiche del nodo,
   pulsanti "simula pericolo da incrocio vicino".
-- Token opzionale (`--token`): se impostato, richiesto come `Authorization: Bearer`.
+- Token (`SC_TOKEN` nel `.env`, oppure `--token`): se impostato, richiesto come `Authorization: Bearer` per
+  tutti i POST e per `/api/inbox/*`; pagine e letture della dashboard restano pubbliche. Il nodo lo legge
+  dal `.env` accanto a `config.json` se `server.token` è vuoto (lo stesso per `SC_P2P_KEY` -> `p2p.key`).
 - `topology.json`: `{"forward_unknown_direction": true, "nodes": {"incrocio-1": {"name": "...",
   "neighbors": {"via": "incrocio-2", "incrocio": "incrocio-3"}}, "incrocio-2": {...}}}`

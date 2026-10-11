@@ -3,69 +3,78 @@ import random
 import requests
 import multiprocessing as mp
 import time
-import statistics
+from pathlib import Path
 from queue import Empty
 
+
+def load_env(start=Path(__file__).resolve().parent, levels=3):
+    """Legge il primo .env trovato qui o nelle cartelle sopra (la radice della repo), senza
+    sovrascrivere le variabili d'ambiente gia' impostate."""
+    for d in [start, *list(start.parents)[:levels]]:
+        p = d / ".env"
+        if p.is_file():
+            for riga in p.read_text(encoding="utf-8-sig").splitlines():
+                riga = riga.strip()
+                if riga and not riga.startswith("#") and "=" in riga:
+                    k, v = riga.split("=", 1)
+                    v = v.strip()
+                    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                        v = v[1:-1]
+                    os.environ.setdefault(k.strip(), v)
+            return p
+    return None
+
+
+load_env()
+
 # Server di destinazione: per il server locale  SC_TRAFFIC_URL=http://localhost:8000/api/traffic
-URL = os.environ.get("SC_TRAFFIC_URL", "https://michubux.pythonanywhere.com/api/traffic")
+URL = os.environ.get("SC_TRAFFIC_URL") or "https://michubux.pythonanywhere.com/api/traffic"
+
+# Segreto condiviso con il server (SC_TOKEN nel file .env, vedi .env.example)
+API_SECRET_TOKEN = os.environ.get("SC_TOKEN", "")
 
 NUM_NODES = 12
 DURATION = 60
 INTERVAL = 1
 TIMEOUT = 15
 
-# Griglia rettangolare 4x3 di 12 incroci reali a Torino
 LUOGHI_TORINO = [
-    # Riga 1
     {"name": "node_01", "latitude": 45.0625, "longitude": 7.6720},
     {"name": "node_02", "latitude": 45.0625, "longitude": 7.6735},
     {"name": "node_03", "latitude": 45.0625, "longitude": 7.6750},
-    # Riga 2
     {"name": "node_04", "latitude": 45.0613, "longitude": 7.6720},
     {"name": "node_05", "latitude": 45.0613, "longitude": 7.6735},
     {"name": "node_06", "latitude": 45.0613, "longitude": 7.6750},
-    # Riga 3
     {"name": "node_07", "latitude": 45.0601, "longitude": 7.6720},
     {"name": "node_08", "latitude": 45.0601, "longitude": 7.6735},
     {"name": "node_09", "latitude": 45.0601, "longitude": 7.6750},
-    # Riga 4
     {"name": "node_10", "latitude": 45.0589, "longitude": 7.6720},
     {"name": "node_11", "latitude": 45.0589, "longitude": 7.6735},
     {"name": "node_12", "latitude": 45.0589, "longitude": 7.6750},
 ]
 
-
 def client_worker(node_number, start_event, stop_event, result_queue):
     node_id = f"node_{node_number:02d}"
-
-    # Assegnazione fissa e deterministica alla griglia 4x3
     luogo = LUOGHI_TORINO[node_number - 1]
 
     latitude = luogo["latitude"]
     longitude = luogo["longitude"]
 
-    print(
-        f"[{node_id}] Posizione assegnata: {luogo['name']} "
-        f"({latitude}, {longitude})",
-        flush=True
-    )
-
-    headers = {"Content-Type": "application/json"}
+    # Header protetti con token segreto
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_SECRET_TOKEN}"
+    }
 
     start_event.wait()
 
     with requests.Session() as session:
         while not stop_event.is_set():
-
-            # Ambulanze più rare (circa 3% di probabilità)
             is_ambulance = 1 if random.random() < 0.03 else 0
 
             dati = {
                 "node_id": node_id,
-                "coordinates": {
-                    "lat": latitude,
-                    "lon": longitude,
-                },
+                "coordinates": {"lat": latitude, "lon": longitude},
                 "counts": {
                     "pedestrians": random.randint(2, 25),
                     "cyclists": random.randint(1, 15),
@@ -93,16 +102,8 @@ def client_worker(node_number, start_event, stop_event, result_queue):
                     "error": None
                 })
 
-                print(
-                    f"[{node_id}] HTTP {risposta.status_code} "
-                    f"- {latenza:.3f}s - "
-                    f"Amb: {is_ambulance}",
-                    flush=True
-                )
-
             except requests.RequestException as errore:
                 latenza = time.perf_counter() - inizio
-
                 result_queue.put({
                     "node_id": node_id,
                     "status": None,
@@ -111,21 +112,9 @@ def client_worker(node_number, start_event, stop_event, result_queue):
                     "error": str(errore)
                 })
 
-                print(f"[{node_id}] ERRORE: {errore}", flush=True)
-
             attesa = max(0, INTERVAL - (time.perf_counter() - inizio))
-
             if stop_event.wait(attesa):
                 break
-
-
-def percentile(valori, percentuale):
-    if not valori:
-        return 0
-    valori = sorted(valori)
-    indice = round((len(valori) - 1) * percentuale / 100)
-    return valori[indice]
-
 
 def main():
     ctx = mp.get_context("spawn")
@@ -134,7 +123,6 @@ def main():
     result_queue = ctx.Queue()
 
     processi = []
-
     for numero in range(1, NUM_NODES + 1):
         p = ctx.Process(
             target=client_worker,
@@ -143,31 +131,29 @@ def main():
         p.start()
         processi.append(p)
 
-    print(
-        f"\nAvvio test griglia: {NUM_NODES} nodi (4x3), "
-        f"{DURATION}s, {INTERVAL}s per richiesta/nodo\n"
-    )
-
-    inizio_test = time.perf_counter()
+    if not API_SECRET_TOKEN:
+        print("ATTENZIONE: SC_TOKEN non impostato (manca il file .env?): il server rispondera' 401")
+    print(f"\nAvvio test sicuro: {NUM_NODES} nodi, {DURATION}s -> {URL}\n")
     start_event.set()
 
+    risultati = []
     try:
-        time.sleep(DURATION)
+        fine = time.monotonic() + DURATION
+        while time.monotonic() < fine:
+            # la coda va svuotata mentre i processi lavorano: se si riempie, i processi non terminano
+            try:
+                risultati.append(result_queue.get(timeout=0.5))
+            except Empty:
+                pass
     except KeyboardInterrupt:
-        print("\nInterruzione del test...")
+        pass
     finally:
         stop_event.set()
-
         for p in processi:
             p.join(timeout=TIMEOUT + 2)
-
-        for p in processi:
             if p.is_alive():
                 p.terminate()
                 p.join()
-
-    durata = time.perf_counter() - inizio_test
-    risultati = []
 
     while True:
         try:
@@ -175,35 +161,13 @@ def main():
         except Empty:
             break
 
-    result_queue.close()
-
-    successi = [r for r in risultati if r["success"]]
-    errori = [r for r in risultati if not r["success"]]
-    latenze = [r["latency"] for r in risultati]
-
-    print("\n========== RISULTATI ==========")
-    print(f"Durata:             {durata:.2f}s")
-    print(f"Nodi:               {NUM_NODES}")
-    print(f"Richieste totali:   {len(risultati)}")
-    print(f"Successi HTTP 2xx:  {len(successi)}")
-    print(f"Errori:             {len(errori)}")
-
-    if durata > 0:
-        print(f"Richieste/s:        {len(risultati) / durata:.2f}")
-
-    if latenze:
-        print(f"Latenza media:      {statistics.mean(latenze):.3f}s")
-        print(f"Latenza mediana:    {statistics.median(latenze):.3f}s")
-        print(f"Latenza p95:        {percentile(latenze, 95):.3f}s")
-        print(f"Latenza massima:    {max(latenze):.3f}s")
-
-    print("\nRichieste per nodo:")
-    for numero in range(1, NUM_NODES + 1):
-        node_id = f"node_{numero:02d}"
-        righe = [r for r in risultati if r["node_id"] == node_id]
-        ok = sum(1 for r in righe if r["success"])
-        print(f"{node_id}: {ok}/{len(righe)} riuscite")
-
+    ok = sum(1 for r in risultati if r["success"])
+    print(f"\nTest completato: {ok}/{len(risultati)} richieste riuscite.")
+    if any(r["status"] in (401, 403) for r in risultati):
+        print("Token rifiutato: SC_TOKEN nel .env deve essere uguale a quello del server.")
+    errori = [r["error"] for r in risultati if r["error"]]
+    if errori:
+        print(f"Errori di rete ({len(errori)}), il primo: {errori[0]}")
 
 if __name__ == "__main__":
     main()

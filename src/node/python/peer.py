@@ -665,6 +665,13 @@ if __name__ == "__main__":
         raw = json.loads(Path(args.config).read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         raw = {}
+    raw = raw if isinstance(raw, dict) else {}
+    try:  # chiave p2p dal .env, come fa il nodo
+        from config import load_env, _secrets_from_env
+        load_env(Path(args.config).resolve().parent)
+        _secrets_from_env(raw)
+    except ImportError:
+        pass
     pcfg = {**(raw.get("p2p") or {}), "enabled": True}
     if args.serial:
         pcfg["serial"] = {**(pcfg.get("serial") or {}), "port": args.serial}

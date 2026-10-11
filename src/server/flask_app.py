@@ -6,8 +6,9 @@ l'adattatore. In locale basta server.py (solo libreria standard, funziona senza 
 PythonAnywhere: nel file WSGI della web app
     import sys
     sys.path.insert(0, "/home/<utente>/HackTurin_2026/src/server")
-    from flask_app import app as application
-Variabili d'ambiente facoltative: SC_DB (database), SC_TOPOLOGY (topologia), SC_TOKEN (token).
+    from flask_app import app as application      (va bene anche il vecchio "from server import app")
+Configurazione nel file .env della repo (vedi .env.example): SC_TOKEN (token dei dispositivi),
+facoltative SC_DB (database) e SC_TOPOLOGY (topologia).
 
 Prova in locale:  pip install -r requirements.txt  ->  python flask_app.py  (porta 5000)
 """
@@ -17,8 +18,10 @@ from flask import Flask, Response, request
 
 import server as core
 
+core.load_env()
 hub = core.Hub(os.environ.get("SC_DB") or str(core.HERE / "server.db"),
-               core.Topology(os.environ.get("SC_TOPOLOGY") or str(core.HERE / "topology.json")))
+               core.Topology(os.environ.get("SC_TOPOLOGY") or str(core.HERE / "topology.json")),
+               wal=False)  # i dischi di rete degli hosting non supportano bene il WAL di SQLite
 TOKEN = os.environ.get("SC_TOKEN", "")
 
 app = Flask(__name__, static_folder=None)  # anche /static passa da dispatch()

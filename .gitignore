@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .venv/
 
+# Segreti (token): restano solo sul PC e sulla board, il modello e' .env.example
+.env
+
 # Archivi e code dei nodi e del server (dati locali, non vanno su GitHub)
 *.db
 *.db-wal

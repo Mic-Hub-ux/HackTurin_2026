@@ -5,9 +5,12 @@
   "piu' camere" ("cameras": {"cam0": {...}, "cam1": {...}}).
 - Non blocca mai l'avvio per un errore di configurazione: restituisce una lista di
   avvisi leggibili e disattiva solo la parte sbagliata.
+- I segreti possono stare nel file .env (accanto a config.json o nella radice della repo) invece
+  che in config.json: SC_TOKEN -> server.token, SC_P2P_KEY -> p2p.key (solo se in config.json sono vuoti).
 """
 import copy
 import json
+import os
 from pathlib import Path
 
 CAMERA_KEYS = ("frame_size", "calibration", "zones", "lines", "lanes", "approaches",
@@ -225,17 +228,62 @@ def prepare(raw):
     return cfg, w
 
 
+ENV_SECRETS = (("SC_TOKEN", "server", "token"), ("SC_P2P_KEY", "p2p", "key"))
+
+
+def load_env(start, levels=3):
+    """Legge il primo .env trovato in start o nelle cartelle sopra (righe CHIAVE=valore, # commenti).
+    Non sovrascrive le variabili d'ambiente gia' impostate. Ritorna il percorso letto o None."""
+    start = Path(start)
+    for d in [start, *list(start.parents)[:levels]]:
+        p = d / ".env"
+        if not p.is_file():
+            continue
+        try:
+            righe = p.read_text(encoding="utf-8-sig").splitlines()
+        except OSError:
+            return None
+        for riga in righe:
+            riga = riga.strip()
+            if not riga or riga.startswith("#") or "=" not in riga:
+                continue
+            k, v = riga.split("=", 1)
+            k, v = k.strip(), v.strip()
+            if k.startswith("export "):
+                k = k[7:].strip()
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                v = v[1:-1]
+            if k:
+                os.environ.setdefault(k, v)
+        return p
+    return None
+
+
+def _secrets_from_env(raw):
+    """Riempie con le variabili d'ambiente (.env) i segreti lasciati vuoti in config.json."""
+    for var, sezione, chiave in ENV_SECRETS:
+        valore = os.environ.get(var, "")
+        sez = raw.get(sezione)
+        if valore and (sez is None or isinstance(sez, dict)) and not (sez or {}).get(chiave):
+            raw.setdefault(sezione, {})[chiave] = valore
+
+
 def load_config(path):
-    """Legge config.json (accetta anche il BOM di Notepad). Ritorna (cfg, avvisi)."""
+    """Legge config.json (accetta anche il BOM di Notepad) e i segreti dal .env. Ritorna (cfg, avvisi)."""
     p = Path(path)
+    avvisi = []
     try:
         raw = json.loads(p.read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
-        return prepare({})[0], [f"{p} non trovato -> uso solo i default"]
+        raw, avvisi = {}, [f"{p} non trovato -> uso solo i default"]
     except json.JSONDecodeError as e:
-        cfg, w = prepare({})
-        return cfg, [f"{p}: JSON non valido (riga {e.lineno}, colonna {e.colno}: {e.msg}) -> uso solo i default"] + w
-    return prepare(raw)
+        raw = {}
+        avvisi = [f"{p}: JSON non valido (riga {e.lineno}, colonna {e.colno}: {e.msg}) -> uso solo i default"]
+    if isinstance(raw, dict):
+        load_env(p.resolve().parent)
+        _secrets_from_env(raw)
+    cfg, w = prepare(raw)
+    return cfg, avvisi + w
 
 
 def public_config(cfg):

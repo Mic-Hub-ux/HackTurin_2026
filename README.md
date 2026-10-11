@@ -71,6 +71,10 @@ docs/          step-by-step guides (Italian): PIANO.md, TUTORIAL.md, GUIDA_DEMO.
 
 # Quick Start
 
+Secrets live in a `.env` file at the repository root (never committed): copy `.env.example` to `.env` and set
+`SC_TOKEN`. The server, `client.py` and the node read it automatically. Every device write (node events,
+`POST /api/traffic`, *Simulate hazard*) needs `Authorization: Bearer <SC_TOKEN>`; pages and dashboard reads stay public.
+
 ```bash
 cd src/server
 python server.py --port 8000
@@ -81,6 +85,11 @@ Simulated grid of 12 intersections on the local server:
 ```bash
 SC_TRAFFIC_URL=http://localhost:8000/api/traffic python src/client/client.py
 ```
+
+**PythonAnywhere** only needs the server files. Use a sparse checkout so the clone contains just these paths:
+`src/server/`, `src/node/python/events.py` (event catalogue) and `src/node/python/web/app.html` (phone page).
+Add a `.env` with `SC_TOKEN` next to them. The WSGI file can keep `from server import app as application`.
+The step-by-step guide is in [docs/GUIDA_DEMO.md](docs/GUIDA_DEMO.md).
 
 Full node pipeline on a video, without the board (YOLO on the PC, same rules as the UNO Q):
 ```bash
