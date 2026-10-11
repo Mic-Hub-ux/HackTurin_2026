@@ -1,78 +1,48 @@
 {
-  "_note": "Rete 12 nodi Torino - Le connessioni 'neighbors' creano le linee tratteggiate sulla mappa",
+  "_note": "Rete nodi Torino - Le connessioni 'neighbors' creano le linee tratteggiate sulla mappa",
   "forward_unknown_direction": true,
   "nodes": {
     "incrocio-1": {
-      "name": "Piazza Castello",
-      "lat": 45.071375, "lon": 7.686231,
-      "pos": [0.5, 0.2],
-      "neighbors": {"sud": "incrocio-2", "ovest": "incrocio-10"}
+      "name": "Via Vincenzo Vela",
+      "lat": 45.06536091290234, "lon": 7.6668949603079035, 
+      "pos": [0.38, 0.05],
+      "neighbors": {"sud-ovest": "incrocio-2", "sud-est": "incrocio-6"}
     },
     "incrocio-2": {
-      "name": "Via Po / San Massimo",
-      "lat": 45.068350, "lon": 7.691262,
-      "pos": [0.6, 0.3],
-      "neighbors": {"nord": "incrocio-1", "est": "incrocio-3"}
+      "name": "Corso Stati uniti",
+      "lat": 45.06462, "lon": 7.666421, 
+      "pos": [0.26, 0.32],
+      "neighbors": {"nord-est": "incrocio-1", "sud-ovest": "incrocio-3"}
     },
     "incrocio-3": {
-      "name": "Piazza Vittorio Veneto",
-      "lat": 45.065275, "lon": 7.694589,
-      "pos": [0.8, 0.4],
-      "neighbors": {"ovest": "incrocio-2"}
+      "name": "Corsto Stati uniti grande",
+      "lat": 45.06439586128232, "lon": 7.666240645919438,
+      "pos": [0.21, 0.40],
+      "neighbors": {"nord-est": "incrocio-2", "sud-ovest": "incrocio-4"}
     },
     "incrocio-4": {
-      "name": "Via Roma / Maria Vittoria",
-      "lat": 45.067373, "lon": 7.682622,
-      "pos": [0.4, 0.4],
-      "neighbors": {"sud": "incrocio-5"}
+      "name": "Corso Rodolfo Montevecchio",
+      "lat": 45.063458608591866, "lon": 7.665606615429119, 
+      "pos": [0.05, 0.75],
+      "neighbors": {"nord-est": "incrocio-3", "sud-est": "incrocio-5"}
     },
     "incrocio-5": {
-      "name": "Piazza San Carlo",
-      "lat": 45.066228, "lon": 7.682126,
-      "pos": [0.4, 0.5],
-      "neighbors": {"nord": "incrocio-4", "sud": "incrocio-6"}
+      "name": "Corso Rodolfo Montevecchio",
+      "lat": 45.06294058767923, "lon": 7.667066126253492, 
+      "pos": [0.42, 0.95],
+      "neighbors": {"nord-ovest": "incrocio-4", "nord-est": "incrocio-6"}
     },
     "incrocio-6": {
-      "name": "Corso Vittorio / Via Roma",
-      "lat": 45.061706, "lon": 7.679860,
-      "pos": [0.4, 0.7],
-      "neighbors": {"nord": "incrocio-5", "sud": "incrocio-11", "ovest": "incrocio-12"}
+      "name": "Stati uniti", 
+      "lat": 45.06387193298677, "lon": 7.667682808451117,
+      "pos": [0.58, 0.60],
+      "neighbors": {"sud-ovest": "incrocio-5", "est": "incrocio-7", "nord-ovest": "incrocio-1"}
     },
     "incrocio-7": {
-      "name": "PoliTO (Corso Einaudi)",
-      "lat": 45.061139, "lon": 7.661858,
-      "pos": [0.1, 0.5],
-      "neighbors": {"nord": "incrocio-8"}
-    },
-    "incrocio-8": {
-      "name": "Crocetta (Corso Stati Uniti)",
-      "lat": 45.063345, "lon": 7.663363,
-      "pos": [0.1, 0.7],
-      "neighbors": {"sud": "incrocio-7", "est": "incrocio-12"}
-    },
-    "incrocio-9": {
-      "name": "Piazza Statuto",
-      "lat": 45.076800, "lon": 7.669865,
-      "pos": [0.1, 0.1],
-      "neighbors": {"est": "incrocio-10"}
-    },
-    "incrocio-10": {
-      "name": "Porta Palazzo",
-      "lat": 45.077673, "lon": 7.682855,
-      "pos": [0.4, 0.1],
-      "neighbors": {"ovest": "incrocio-9", "sud": "incrocio-1"}
-    },
-    "incrocio-11": {
-      "name": "Porta Nuova",
-      "lat": 45.059439, "lon": 7.680045,
-      "pos": [0.4, 0.9],
-      "neighbors": {"nord": "incrocio-6"}
-    },
-    "incrocio-12": {
-      "name": "Corso Matteotti",
-      "lat": 45.063131, "lon": 7.674395,
-      "pos": [0.2, 0.6],
-      "neighbors": {"est": "incrocio-6", "ovest": "incrocio-8"}
+      "name": "Stati uniti",
+      "lat": 45.06337633933598, "lon": 7.6690913479908405, 
+      "pos": [0.95, 0.78],
+      "neighbors": {"ovest": "incrocio-6"}
     }
   }
 }
