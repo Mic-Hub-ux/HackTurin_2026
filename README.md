@@ -1,5 +1,7 @@
 # CROSS – Cognitive Road Operations & Smart Signaling (team Efesto, HackTurin 2026)
 
+> Terzo posto HackTurin 2026 
+
 **Tutta la documentazione del progetto si trova nel file [Efesto.pdf](Efesto.pdf).**
 
 **Video di presentazione del progetto: [guardalo su YouTube](https://www.youtube.com/watch?v=bz3QYN31SZ0).**
