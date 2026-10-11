@@ -5,44 +5,50 @@
     "incrocio-1": {
       "name": "Via Vincenzo Vela",
       "lat": 45.06536091290234, "lon": 7.6668949603079035, 
-      "pos": [0.38, 0.05],
-      "neighbors": {"sud-ovest": "incrocio-2", "sud-est": "incrocio-6"}
+      "pos": [0.40, 0.10],
+      "neighbors": {"sud-ovest": "incrocio-2", "est": "incrocio-8"}
     },
     "incrocio-2": {
       "name": "Corso Stati uniti",
       "lat": 45.06462, "lon": 7.666421, 
-      "pos": [0.26, 0.32],
+      "pos": [0.30, 0.35],
       "neighbors": {"nord-est": "incrocio-1", "sud-ovest": "incrocio-3"}
     },
     "incrocio-3": {
       "name": "Corsto Stati uniti grande",
       "lat": 45.06439586128232, "lon": 7.666240645919438,
-      "pos": [0.21, 0.40],
+      "pos": [0.25, 0.45],
       "neighbors": {"nord-est": "incrocio-2", "sud-ovest": "incrocio-4"}
     },
     "incrocio-4": {
       "name": "Corso Rodolfo Montevecchio",
       "lat": 45.063458608591866, "lon": 7.665606615429119, 
-      "pos": [0.05, 0.75],
+      "pos": [0.10, 0.75],
       "neighbors": {"nord-est": "incrocio-3", "sud-est": "incrocio-5"}
     },
     "incrocio-5": {
       "name": "Corso Rodolfo Montevecchio",
       "lat": 45.06294058767923, "lon": 7.667066126253492, 
-      "pos": [0.42, 0.95],
+      "pos": [0.45, 0.90],
       "neighbors": {"nord-ovest": "incrocio-4", "nord-est": "incrocio-6"}
     },
     "incrocio-6": {
       "name": "Stati uniti", 
       "lat": 45.06387193298677, "lon": 7.667682808451117,
-      "pos": [0.58, 0.60],
-      "neighbors": {"sud-ovest": "incrocio-5", "est": "incrocio-7", "nord-ovest": "incrocio-1"}
+      "pos": [0.60, 0.60],
+      "neighbors": {"sud-ovest": "incrocio-5", "nord": "incrocio-8", "est": "incrocio-7"}
     },
     "incrocio-7": {
       "name": "Stati uniti",
       "lat": 45.06337633933598, "lon": 7.6690913479908405, 
-      "pos": [0.95, 0.78],
+      "pos": [0.95, 0.80],
       "neighbors": {"ovest": "incrocio-6"}
+    },
+    "incrocio-8": {
+      "name": "Via Manfredo fanti",
+      "lat": 45.064771364312264, "lon": 7.66829637845482,  
+      "pos": [0.75, 0.30],
+      "neighbors": {"sud": "incrocio-6", "ovest": "incrocio-1"}
     }
   }
 }
