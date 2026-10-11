@@ -160,6 +160,11 @@ class Tracker:
                 continue
             obs.append((label, img, world, size, box, conf))
 
+        # prima chiudo le tracce sparite da troppo: un oggetto nuovo non deve "ereditarle"
+        chiuse = [tr for tr in self.tracks.values() if t - tr.last_seen > self.max_age_s]
+        for tr in chiuse:
+            del self.tracks[tr.id]
+
         coppie = []
         lim = LIMITI[self.space]
         for oi, (label, img, world, size, box, conf) in enumerate(obs):
@@ -200,9 +205,6 @@ class Tracker:
                 self._next += 1
                 self.tracks[tid] = Track(tid, label, t, img, world, size, box, conf, self.camera_id)
 
-        chiuse = [tr for tr in self.tracks.values() if t - tr.last_seen > self.max_age_s]
-        for tr in chiuse:
-            del self.tracks[tr.id]
         if len(self.tracks) > self.max_tracks:  # protezione memoria: via le piu' vecchie non confermate
             extra = sorted(self.tracks.values(), key=lambda tr: (tr.hits >= self.min_hits, tr.last_seen))
             for tr in extra[: len(self.tracks) - self.max_tracks]:

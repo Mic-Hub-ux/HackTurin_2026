@@ -99,7 +99,11 @@ class Node:
             n_det = sum(len(v) for v in (detections or {}).values() if isinstance(v, (list, tuple))) \
                 if isinstance(detections, dict) else 0
             self.health.on_frame(t, cam, proc_ms, n_det)
-            self._safe(self.stats.on_frame, t, cam, engine.tracker_recent(t), engine.space, engine.zones_of)
+            recenti = engine.tracker_recent(t)
+            self._safe(self.stats.on_frame, t, cam, recenti, engine.space, engine.zones_of)
+            # LED in tempo reale: chi c'e' adesso davanti alla camera, senza aspettare il tick
+            self._safe(self.leds.set_presence, {tr.label for tr in recenti}, t)
+            self._safe(self.leds.push, t)
             self._scene(t)
             return out
 
@@ -142,11 +146,14 @@ class Node:
 
     def _on_message(self, msg):
         """Messaggi prodotti dalle regole (hazard) e dalle tracce chiuse (track)."""
-        self._publish(msg)
         tipo = msg.get("type")
         if tipo == "hazard":
-            self._safe(self.stats.on_event, msg)
+            # prima il LED (decide il nodo, subito), poi archivio e invio al server
             self._safe(self.leds.on_hazard, msg, True, msg.get("ts", 0) / 1000)
+            self._safe(self.leds.push, msg.get("ts", 0) / 1000 or None)
+        self._publish(msg)
+        if tipo == "hazard":
+            self._safe(self.stats.on_event, msg)
             self._safe(self.peer.send_hazard, msg)  # agli incroci vicini e ai wearable, senza server
         elif tipo == "track":
             self._safe(self.stats.on_track, msg)
@@ -185,6 +192,7 @@ class Node:
             self._publish(m)
             if m["type"] == "remote_hazard":
                 self._safe(self.leds.on_hazard, m, False, time.time())
+                self._safe(self.leds.push, time.time())
                 self._safe(self.stats.on_event, m)
             return True
 

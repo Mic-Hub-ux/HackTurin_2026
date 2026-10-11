@@ -30,13 +30,13 @@
   },
   "crosswalk_direction_names": ["sinistra->destra", "destra->sinistra"],
 
-  "neighbors": {"via": "incrocio-2", "incrocio": "incrocio-3"},
+  "neighbors": {"via": "incrocio-2", "incrocio": "incrocio-6"},
   "traffic_light": {"mode": "none"},
   "thresholds": {"speed_limit_kmh": 50},
 
   "server": {"url": "https://michubux.pythonanywhere.com", "token": "", "poll_s": 1.0},
   "publish": {"send": {"scene": true}},
-  "leds": {"enabled": true, "roles": ["local", "remote", "emergency", "status"]},
+  "leds": {"enabled": true, "roles": ["person", "emergency", "hazard", "cyclist"]},
   "p2p": {"enabled": true, "peers": [], "key": "", "serial": {"port": ""}},
   "api": {"enabled": false, "port": 8100},
   "data": {"stats_interval_s": 60, "retention_days": 7}

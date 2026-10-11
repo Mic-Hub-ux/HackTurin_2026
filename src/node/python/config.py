@@ -60,11 +60,12 @@ DEFAULTS = {
     # Il computer-server: riceve tutti i dati e inoltra i pericoli agli incroci vicini.
     # Se publish.url e' vuoto, gli eventi vanno a <server.url>/api/events.
     "server": {"url": "", "token": "", "poll_s": 1.0, "timeout_s": 3},
-    # I 4 LED collegati ai pin dell'MCU (vedi node/sketch/sketch.ino). Ruoli possibili:
-    # local = pericolo visto qui, remote = pericolo arrivato dal server (incrocio vicino),
-    # emergency = mezzo di emergenza, status = acceso se il server risponde / lampeggia se offline,
-    # any = qualsiasi pericolo (locale o remoto)
-    "leds": {"enabled": True, "roles": ["local", "remote", "emergency", "status"],
+    # I 4 LED collegati ai pin D2..D5 dell'MCU (vedi node/sketch/sketch.ino). Ruoli possibili:
+    # person (giallo) / cyclist (verde) / vehicle = acceso finche' la camera li vede,
+    # emergency (blu) = mezzo di emergenza visto qui o da un vicino, hazard (rosso) = pericolo
+    # (locale acceso o veloce, da un vicino lento), local / remote = solo pericoli locali / remoti,
+    # status = acceso se il server o un vicino risponde, any = qualsiasi pericolo
+    "leds": {"enabled": True, "roles": ["person", "emergency", "hazard", "cyclist"],
              "hold_s": 10, "min_severity": 2, "refresh_s": 1.0, "ttl_ms": 3000},
     # Peer-to-peer tra incroci e verso i wearable, SENZA server (vedi peer.py e firmware/):
     # UDP multicast sulla rete locale (basta un hotspot, niente internet) e/o ESP-NOW via un

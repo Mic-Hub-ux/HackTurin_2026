@@ -609,18 +609,26 @@ class Hub:
         attivi = {}
         for a in self.summary()["active"]:
             attivi.setdefault(a["node"], []).append(a)
+        with self.lock:
+            legacy = {k: dict(v) for k, v in self.legacy.items()}
         out = []
         for n in self.nodes()["nodes"]:
             counts, window = self._counts(n["id"], n.get("stats"), t)
+            online, last_seen = n["online"], n["last_seen"]
+            sim = legacy.pop(n["id"], None)
+            # il client.py puo' simulare un incrocio della topologia con lo stesso nome: i suoi conteggi
+            # riempiono solo gli incroci che non hanno MAI mandato dati veri (la board vince sempre)
+            simulated = bool(sim) and not n["last_seen"] and t - sim.get("_rx", 0) <= self.offline_ms
+            if simulated:
+                counts = {**counts, **{k: v for k, v in (sim.get("counts") or {}).items() if _is_num(v)}}
+                window, online, last_seen = "simulated", True, sim.get("_rx")
             out.append({
                 "node_id": n["id"], "name": n["name"], "source": "virtual" if n["virtual"] else "board",
                 "coordinates": _coords(topo.get(n["id"]) or {}), "counts": counts, "counts_window": window,
-                "online": n["online"], "last_seen": n["last_seen"], "neighbors": n["neighbors"],
+                "online": online, "last_seen": last_seen, "neighbors": n["neighbors"], "simulated": simulated,
                 "status": _status_brief(n.get("status")), "active_hazards": attivi.get(n["id"], []),
                 "active_remote": n["active_remote"]})
-        with self.lock:
-            legacy = [dict(v) for v in self.legacy.values()]
-        for v in legacy:
+        for v in legacy.values():
             rx = v.pop("_rx", 0)
             out.append({**v, "name": v["node_id"], "source": "client", "online": t - rx <= self.offline_ms,
                         "last_seen": rx, "counts_window": "live", "neighbors": {}, "status": None,
@@ -915,8 +923,18 @@ class Handler(BaseHTTPRequestHandler):
         self._go("OPTIONS")
 
     def _go(self, method):
+        self._body_read = False
         r = dispatch(self.hub, self.token, method, self.path, self.headers.get("Authorization"),
                      self._read_body, self.client_address[0])
+        if not self._body_read:
+            # corpo non letto (es. risposta 401): lo scarto, altrimenti chiudendo la connessione
+            # Windows manda un reset e il client vede "connessione interrotta" invece del 401
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                if 0 < n <= MAX_BODY:
+                    self.rfile.read(n)
+            except (ValueError, OSError):
+                pass
         try:
             self.send_response(r.code)
             self.send_header("Content-Type", r.ctype)
@@ -930,6 +948,7 @@ class Handler(BaseHTTPRequestHandler):
             pass  # il client ha chiuso la connessione
 
     def _read_body(self):
+        self._body_read = True
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:

@@ -44,9 +44,9 @@
         .forward-line { animation: dash 1s linear infinite; }
         @keyframes dash { to { stroke-dashoffset: -24; } }
         .led { width: 10px; height: 10px; border-radius: 9999px; display: inline-block; background: #475569; }
-        .led.on { background: #f43f5e; box-shadow: 0 0 6px #f43f5e; }
-        .led.slow { animation: blink 1s steps(1) infinite; background: #f43f5e; }
-        .led.fast { animation: blink .25s steps(1) infinite; background: #f43f5e; }
+        .led.on, .led.slow, .led.fast { background: var(--c, #f43f5e); box-shadow: 0 0 6px var(--c, #f43f5e); }
+        .led.slow { animation: blink 1s steps(1) infinite; }
+        .led.fast { animation: blink .25s steps(1) infinite; }
         @keyframes blink { 50% { opacity: .15; } }
     </style>
 </head>
@@ -176,12 +176,12 @@
             <section data-panel="nodes" class="space-y-3 hidden">
                 <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Smart Crossing Nodes</label>
                 <div id="nodeCards" class="space-y-2"></div>
-                <p class="text-[11px] text-slate-400">LEDs on the board: 1 local hazard &middot; 2 hazard from a neighbor &middot; 3 emergency &middot; 4 link to server/peers.</p>
+                <p class="text-[11px] text-slate-400">LEDs on the board: yellow = person &middot; blue = emergency &middot; red = hazard (blinking slowly if from a neighbor) &middot; green = cyclist.</p>
             </section>
 
             <!-- TAB: Simulate -->
             <section data-panel="simulate" class="space-y-4 hidden">
-                <p class="text-xs text-slate-500 dark:text-slate-400">Pretend that an intersection detected a hazard: the server forwards it like a real one and the board lights LED 2.</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Pretend that an intersection detected a hazard: the server forwards it like a real one and the board lights the red LED.</p>
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <label class="space-y-1"><span class="text-slate-500 dark:text-slate-400">Seen by</span>
                         <select id="simFrom" class="w-full py-2 px-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"></select></label>
@@ -350,14 +350,14 @@
                     <span class="text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="${icon}" class="w-3.5 h-3.5 text-${color}-500"></i>${label}</span>
                     <span class="font-bold text-slate-900 dark:text-white">${v ?? 0}</span>
                 </div>`;
-            const windowLabel = { live: 'Live counts', last_period: 'Last statistics period', none: 'No data yet' }[n.counts_window] || 'Live counts';
+            const windowLabel = { live: 'Live counts', last_period: 'Last statistics period', none: 'No data yet', simulated: 'Simulated counts (client.py)' }[n.counts_window] || 'Live counts';
             const st = n.status;
             const haz = [...(n.active_hazards || []).map(a => ({ ...a, where: 'here' })), ...(n.active_remote || []).map(a => ({ ...a, where: 'from ' + a.from_node }))];
             return `
                 <div class="min-w-[220px] font-sans overflow-hidden">
                     <div class="px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-600">
                         <h3 class="font-bold text-slate-900 dark:text-white text-sm">${esc(n.name || n.node_id)}</h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-300">${windowLabel} &middot; ${n.online ? 'online' : 'offline'}${n.source === 'client' ? ' &middot; simulated' : ''}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-300">${windowLabel} &middot; ${n.online ? 'online' : 'offline'}${n.source === 'client' || n.simulated ? ' &middot; simulated' : ''}</p>
                     </div>
                     <div class="p-3 space-y-2.5">
                         ${layerOn('pedestrians') ? row('user', 'blue', 'Pedestrians', c.pedestrians) : ''}
@@ -544,7 +544,13 @@
             const modes = (st && st.leds && st.leds.modes) || null;
             if (!modes) return '<span class="text-slate-400">no LED data</span>';
             const cls = ['', 'on', 'slow', 'fast'];
-            return modes.map((m, i) => `<span title="LED ${i + 1}" class="led ${cls[m] || ''}"></span>`).join(' ');
+            const COL = { person: ['#facc15', 'person'], cyclist: ['#22c55e', 'cyclist'], emergency: ['#3b82f6', 'emergency'],
+                          hazard: ['#ef4444', 'hazard'], vehicle: ['#a855f7', 'vehicle'] };
+            const roles = (st.leds && st.leds.roles) || [];
+            return modes.map((m, i) => {
+                const [c, name] = COL[roles[i]] || ['#f43f5e', roles[i] || ''];
+                return `<span title="LED ${i + 1} ${name}" class="led ${cls[m] || ''}" style="--c:${c}"></span>`;
+            }).join(' ');
         }
 
         function renderNodes() {

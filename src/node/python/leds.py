@@ -1,7 +1,14 @@
 """I 4 LED di segnalazione, accesi dall'MCU (STM32) della UNO Q su comando del Python.
 
 Ogni LED ha un ruolo (config leds.roles) e un modo: 0 spento, 1 acceso, 2 lampeggio lento (1 Hz),
-3 lampeggio veloce (4 Hz). I 4 modi viaggiano in un solo intero (2 bit per LED, LED 1 = bit 0-1):
+3 lampeggio veloce (4 Hz). Ruoli di default (un colore per LED, D2..D5):
+    person    (giallo) acceso finche' la camera vede una persona
+    emergency (blu)    lampeggio veloce: mezzo di emergenza visto qui o segnalato da un vicino
+    hazard    (rosso)  pericolo: visto qui (acceso / veloce se grave) o da un vicino (lento)
+    cyclist   (verde)  acceso finche' la camera vede un ciclista
+Altri ruoli: local, remote, status, any, vehicle, none.
+Tempo reale: il nodo chiama push() appena cambia qualcosa (presenze a ogni frame, pericoli
+all'arrivo); il keep-alive verso l'MCU resta in tick(). I 4 modi viaggiano in un solo intero (2 bit per LED, LED 1 = bit 0-1):
     bridge.call("set_leds", packed, ttl_ms)        -> node/sketch/sketch.ino, set_leds(int, int)
 Se l'MCU non riceve comandi per ttl_ms spegne tutto da solo (fail-safe "cervello offline"):
 per questo il valore viene rimandato ogni refresh_s anche quando non cambia.
@@ -11,7 +18,8 @@ Bridge.call e' bloccante (fino a 10 s di timeout), e un Bridge bloccato non deve
 import threading
 import time
 
-RUOLI = ("local", "remote", "emergency", "status", "any", "none")
+RUOLI = ("person", "cyclist", "vehicle", "hazard", "emergency", "local", "remote", "status", "any", "none")
+PRESENZA_HOLD_S = 0.5             # una classe resta "presente" ancora 0,5 s: niente sfarfallio
 NOMI_MODI = {0: "spento", 1: "acceso", 2: "lento", 3: "veloce"}
 LOCAL_MODE = {3: 3, 2: 1, 1: 2}   # severity del pericolo locale -> modo
 CALL_TIMEOUT_S = 2.0              # oltre ttl_ms l'MCU e' comunque gia' in fail-safe
@@ -49,6 +57,8 @@ class LedController:
         self._lock = threading.Lock()
         self._local = {}    # id -> {"sev", "emergency", "until"}
         self._remote = {}
+        self._seen = {}     # classe vista dalla camera -> ultimo istante
+        self._online = False
         self._modes = [0, 0, 0, 0]
         self._packed = None             # ultimo valore calcolato
         self._last_queued = None        # time.monotonic() dell'ultimo invio messo in coda
@@ -120,14 +130,29 @@ class LedController:
             if len(attivi) > MAX_ATTIVI:
                 del attivi[min(attivi, key=lambda k: attivi[k]["until"])]
 
+    def set_presence(self, classes, t):
+        """Classi viste adesso dalla camera (person, cyclist, vehicle, emergency)."""
+        if not self.enabled:
+            return
+        with self._lock:
+            for c in classes:
+                self._seen[str(c)] = float(t)
+
+    def push(self, t=None):
+        """Aggiorna subito i LED se qualcosa e' cambiato (senza aspettare il tick)."""
+        self.tick(t, None)
+
     def tick(self, t, online):
-        """Ricalcola i modi e li manda all'MCU se cambiati, o comunque ogni refresh_s (keep-alive)."""
+        """Ricalcola i modi e li manda all'MCU se cambiati, o comunque ogni refresh_s (keep-alive).
+        online=None: lascia lo stato di collegamento dell'ultimo tick."""
         if not self.enabled:
             return
         try:
             t = time.time() if t is None else float(t)
             with self._lock:
-                modes = self._compute(t, bool(online))
+                if online is not None:
+                    self._online = bool(online)
+                modes = self._compute(t, self._online)
                 packed = sum(m << (2 * i) for i, m in enumerate(modes))
                 cambiato = packed != self._packed
                 self._modes, self._packed = modes, packed
@@ -153,8 +178,16 @@ class LedController:
         remote_sev = max((h["sev"] for h in self._remote.values()), default=0)
         remote = 0 if not remote_sev else (3 if remote_sev >= 3 else 2)
         emerg = any(h["emergency"] for d in (self._local, self._remote) for h in d.values())
-        per_ruolo = {"local": local, "remote": remote, "emergency": 3 if emerg else 0,
-                     "status": 1 if online else 2, "any": max(local, remote), "none": 0}
+        # rosso: pericoli che non sono emergenze (le emergenze hanno il loro LED blu)
+        loc_h = max((h["sev"] for h in self._local.values() if h["sev"] >= self.min_severity
+                     and not h["emergency"]), default=0)
+        rem_h = max((h["sev"] for h in self._remote.values() if not h["emergency"]), default=0)
+        hazard = LOCAL_MODE.get(loc_h, 0) or (0 if not rem_h else (3 if rem_h >= 3 else 2))
+        vede = {c for c, ts in self._seen.items() if t - ts <= PRESENZA_HOLD_S}
+        per_ruolo = {"local": local, "remote": remote, "emergency": 3 if emerg or "emergency" in vede else 0,
+                     "status": 1 if online else 2, "any": max(local, remote), "none": 0,
+                     "hazard": hazard, "person": 1 if "person" in vede else 0,
+                     "cyclist": 1 if "cyclist" in vede else 0, "vehicle": 1 if "vehicle" in vede else 0}
         return [per_ruolo[r] for r in self.roles]
 
     # ------------------------------------------------------------------ invio all'MCU

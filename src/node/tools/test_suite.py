@@ -424,7 +424,8 @@ def test_nodo_e_server():
                   and any(c.get("heatmap") for c in cams), cams)
             check("archivio: heatmap accumulata", st.heatmap(camera="cam0"))
             check("nodo: stato di salute", (st.latest("status") or {}).get("cameras"))
-            check("LED 1 (pericolo locale) acceso durante l'invasione", any(m[0] > 0 for m in led), led)
+            check("LED rosso (pericolo) acceso durante l'invasione", any(m[2] > 0 for m in led), led)
+            check("LED giallo e verde spenti: c'era solo un'auto", not any(m[0] or m[3] for m in led), led)
             check("pericolo con incrocio successivo (next_nodes)", any(e.get("next_nodes") == ["incrocio-3"] for e in ev),
                   [e.get("next_nodes") for e in ev])
 
@@ -446,10 +447,9 @@ def test_nodo_e_server():
             http_json(f"{url}/api/simulate", {"from_node": "incrocio-2", "to_node": "incrocio-1",
                                               "kind": "bike_lane_invasion", "severity": 3})
             n = node.remote.poll_once()
+            m = modes(bridge.calls[-1][1][0])  # senza tick: il LED cambia appena arriva il pericolo
+            check("dashboard -> server -> board: LED rosso subito, senza aspettare il tick", n >= 1 and m[2] > 0, (n, m))
             node.tick(time.time())
-            m = modes(bridge.calls[-1][1][0])
-            check("dashboard -> server -> board: LED 2 (pericolo vicino) acceso", n >= 1 and m[1] > 0, (n, m))
-            check("LED 4 (stato) acceso: server raggiungibile", m[3] == 1, m)
             remoti = [e for e in st.query("events", limit=None) if e.get("type") == "remote_hazard"]
             check("pericolo remoto archiviato", remoti)
 
@@ -461,12 +461,12 @@ def test_nodo_e_server():
                              "category": "emergency", "severity": 3, "action": "new", "from_node": "incrocio-2",
                              "ts": now, "expires": now + 60000})
             node.tick(time.time())
-            check("ambulanza segnalata da un vicino: LED 3 lampeggio veloce", modes(bridge.calls[-1][1][0])[2] == 3)
+            check("ambulanza segnalata da un vicino: LED blu lampeggio veloce", modes(bridge.calls[-1][1][0])[1] == 3)
             node._on_server({"type": "remote_hazard", "id": "test-emerg", "kind": "emergency_vehicle",
                              "category": "emergency", "severity": 3, "action": "cancel", "from_node": "incrocio-2",
                              "ts": now, "expires": now})
             node.tick(time.time())
-            check("cancel dell'ambulanza: LED 3 spento", modes(bridge.calls[-1][1][0])[2] == 0)
+            check("cancel dell'ambulanza: LED blu spento", modes(bridge.calls[-1][1][0])[1] == 0)
             nodi = http_json(f"{url}/api/nodes")
             check("server: elenco nodi", "incrocio-1" in json.dumps(nodi))
             with urllib.request.urlopen(url + "/", timeout=5) as r:
@@ -497,6 +497,37 @@ def test_nodo_e_server():
             httpd.shutdown()
             httpd.server_close()
             httpd.hub.close()
+
+
+@test
+def test_led_tempo_reale():
+    """Giallo = persona, verde = ciclista, blu = emergenza: accesi al frame stesso, senza tick."""
+    from node import Node
+    with tempfile.TemporaryDirectory() as tmp:
+        bridge = FakeBridge()
+        node = Node(node_cfg("incrocio-1"), base_dir=tmp, bridge=bridge, start_threads=False)
+        try:
+            def frame(dets, t):
+                det = {}
+                for label, x1, y1, x2, y2 in dets:
+                    det.setdefault(label, []).append({"confidence": 0.9, "bounding_box_xyxy": (x1, y1, x2, y2)})
+                node.process(det, "cam0", t)
+                return modes(bridge.calls[-1][1][0]) if bridge.calls else None
+
+            t0 = time.time()
+            persona = [sim.box("person", 3.0, 15.0, 0.02, 0.07)]
+            m = [frame(persona, t0 + k * 0.1) for k in range(3)]
+            check("LED giallo acceso appena la camera vede una persona (2-3 frame)", m[-1] and m[-1][0] == 1, m)
+            m = frame([], t0 + 1.5)
+            check("LED giallo spento quando la persona sparisce", m and m[0] == 0, m)
+            bici = sim.ciclista(lambda tau: (8.3, 15.0), 5)
+            m = [frame(bici(0), t0 + 10 + k * 0.1) for k in range(3)]
+            check("LED verde acceso con un ciclista", m[-1] and m[-1][3] == 1, m)
+            amb = [sim.box("ambulance", 5.0, 15.0, 0.08, 0.06)]
+            m = [frame(amb, t0 + 20 + k * 0.1) for k in range(3)]
+            check("LED blu lampeggio veloce con un mezzo di emergenza", m[-1] and m[-1][1] == 3, m)
+        finally:
+            node.close()
 
 
 @test
@@ -581,7 +612,7 @@ def test_peer_to_peer():
             check("p2p senza server: incrocio-3 riceve il pericolo di incrocio-1",
                   any(e.get("kind") == "bike_lane_invasion" and e.get("via") == "p2p" for e in remoti),
                   [(e.get("kind"), e.get("via")) for e in remoti])
-            check("p2p: LED 2 acceso su incrocio-3", bridge_b.calls and modes(bridge_b.calls[-1][1][0])[1] > 0)
+            check("p2p: LED rosso acceso su incrocio-3", bridge_b.calls and modes(bridge_b.calls[-1][1][0])[2] > 0)
             a.peer.send_heartbeat()
             b.peer.poll_once(0.3)
             check("p2p: heartbeat -> vicino online", b.peer.online and "incrocio-1" in b.peer.peers())
@@ -642,7 +673,7 @@ def main():
     for fn in (test_scenari_base, test_u_turn, test_collisione_e_mancato_investimento, test_sorpasso_ciclista,
                test_coda, test_pedoni, test_movimento_vietato, test_semaforo, test_cicli_di_vita,
                test_regole_senza_calibrazione, test_riepiloghi, test_robustezza, test_configurazione,
-               test_nodo_e_server, test_token_e_env, test_peer_to_peer, test_api_e_pagina_telefono,
+               test_nodo_e_server, test_led_tempo_reale, test_token_e_env, test_peer_to_peer, test_api_e_pagina_telefono,
                test_fusione_due_camere):
         print(f"\n== {fn.__name__}")
         fn()

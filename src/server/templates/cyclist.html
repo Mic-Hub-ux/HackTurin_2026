@@ -210,7 +210,7 @@
                     valCyclists.textContent = counts.cyclists ?? '-';
                     valVehicles.textContent = counts.vehicles ?? '-';
                     valAmbulances.textContent = counts.ambulances ?? '-';
-                    const win = { live: 'live', last_period: 'last minute', none: 'no data yet' }[currentNode.counts_window] || 'live';
+                    const win = { live: 'live', last_period: 'last minute', none: 'no data yet', simulated: 'simulated' }[currentNode.counts_window] || 'live';
                     document.getElementById('nodeInfo').textContent =
                         `${currentNode.online ? 'online' : 'offline'} · counts ${win}${currentNode.source === 'client' ? ' · simulated node' : ''}`;
 
